@@ -72,8 +72,8 @@ void GlobalInitializer::clean() {
     spdlog::drop_all();
 #endif
 
-#ifdef MSVC_LEAKER_DETECT
-    // MSVC 内存泄露检测，输出至 VS 的输出窗口
+#if defined(_MSC_VER) && !defined(BUILD_MONOLITHIC)
+	// MSVC 内存泄露检测，输出至 VS 的输出窗口
     _CrtDumpMemoryLeaks();
 #endif
 }
