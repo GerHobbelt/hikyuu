@@ -62,7 +62,6 @@ elseif is_plat("macosx") then
     add_requires("brew::hdf5")
 end
 
-
 add_requires("boost " .. boost_version, {system=false, 
     configs = {
         shared=is_plat("windows") and true or false,
@@ -72,9 +71,9 @@ add_requires("boost " .. boost_version, {system=false,
         serialization=true, 
         system=true, 
         python=true, 
-        python_version = get_config("pyver"),
-        use_system_python = get_config("use_system_python"),
+        pyver = get_config("pyver"),
     }})
+
 
 -- add_requires("fmt 8.1.1", {system=false, configs = {header_only = true}})
 add_requires("spdlog", {system=false, configs = {header_only = true, fmt_external=true, vs_runtime = "MD"}})
