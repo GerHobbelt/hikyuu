@@ -14,10 +14,10 @@ package("mysql")
     elseif is_plat("linux", "cross") and is_arch("aarch64", "arm64.*") then
         add_urls("https://github.com/fasiondog/hikyuu_extern_libs/releases/download/1.0.0/mysql-$(version)-linux-aarch64.zip",
                  "https://gitee.com/fasiondog/hikyuu_extern_libs/releases/download/1.0.0/mysql-$(version)-linux-aarch64.zip")
-        add_versions("8.0.31", "5ceb31ddc75bfaa0ec5324fa1564dae3abdb7ea9d3f0763f10d06e871d21d7d4")
+        add_versions("8.0.21", "5ceb31ddc75bfaa0ec5324fa1564dae3abdb7ea9d3f0763f10d06e871d21d7d4")
     end
 
-    on_install("windows", "linux", function (package)
+    on_install("windows", "linux", "cross", function (package)
         os.cp("include", package:installdir())
         os.cp("lib", package:installdir())
         if package:is_plat("windows") then
