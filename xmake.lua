@@ -37,7 +37,7 @@ else
 end
 
 -- set language: C99, c++ standard
-set_languages("cxx17", "C99")
+set_languages("cxx17", "c99")
 
 local hdf5_version = "1.12.2"
 local mysql_version = "8.0.31"
@@ -65,7 +65,7 @@ end
 add_requires("spdlog", {system=false, configs = {header_only = true, fmt_external=true, vs_runtime = "MD"}})
 add_requireconfs("spdlog.fmt", {override = true, version = "8.1.1", configs = {header_only = true}})
 add_requires("sqlite3", {system=false, configs = {shared=true, vs_runtime="MD", cxflags="-fPIC"}})
-add_requires("flatbuffers", {system=false, configs = {vs_runtime="MD"}})
+add_requires("flatbuffers 2.0.0", {system=false, configs = {vs_runtime="MD"}})
 add_requires("nng", {system=false, configs = {vs_runtime="MD", cxflags="-fPIC"}})
 add_requires("nlohmann_json", {system=false})
 add_requires("cpp-httplib", {system=false})
