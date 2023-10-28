@@ -1,5 +1,13 @@
 set_xmakever("2.8.2")
--- Last Modified: 2023-08-08 11:28:13
+
+option("feedback")
+    set_default(true)
+    set_showmenu(true)
+    set_category("hikyuu")
+    set_description("Enable send feedback.")
+    add_defines("HKU_SEND_FEEDBACK")
+option_end()
+
 
 -- project
 set_project("hikyuu")
@@ -8,7 +16,7 @@ add_rules("mode.debug", "mode.release")
 if not is_plat("windows") then add_rules("mode.coverage", "mode.asan", "mode.msan", "mode.tsan", "mode.lsan") end
 
 -- version
-set_version("1.2.8", {build = "%Y%m%d%H%M"})
+set_version("1.2.9", {build = "%Y%m%d%H%M"})
 set_configvar("LOG_ACTIVE_LEVEL", 0) -- 激活的日志级别
 -- if is_mode("debug") then
 --    set_configvar("LOG_ACTIVE_LEVEL", 0)  -- 激活的日志级别
@@ -27,6 +35,7 @@ set_configvar("SUPPORT_TEXT_ARCHIVE", 0)
 set_configvar("SUPPORT_XML_ARCHIVE", 1)
 set_configvar("SUPPORT_BINARY_ARCHIVE", 1)
 set_configvar("HKU_DISABLE_ASSERT", 0)
+set_configvar("ENABLE_LEAK_DETECT", true)
 
 -- set warning all as error
 if is_plat("windows") then
@@ -86,7 +95,7 @@ add_requires("sqlite3", {system = false, configs = {shared = true, vs_runtime = 
 add_requires("flatbuffers v" .. flatbuffers_version, {system = false, configs = {vs_runtime = "MD"}})
 add_requires("nng", {system = false, configs = {vs_runtime = "MD", cxflags = "-fPIC"}})
 add_requires("nlohmann_json", {system = false})
-add_requires("cpp-httplib", {system = false})
+add_requires("cpp-httplib", {system = false, configs = {zlib = true, ssl = true}})
 add_requires("zlib", {system = false})
 
 add_defines("SPDLOG_DISABLE_DEFAULT_LOGGER") -- 禁用 spdlog 默认ogger
