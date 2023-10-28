@@ -1,4 +1,4 @@
-name: win2019-python-build
+name: win-python-build
 
 on: [push, pull_request]
 
@@ -26,4 +26,4 @@ jobs:
       run: |
         cd hikyuu
         xmake f -y --pyver=3.11
-        xmake -bvD core
+        xmake -b core
