@@ -139,7 +139,18 @@ public:
     BlockList getBlockList();
 
     // 目前支持"SH"
+    /**
+     * 获取交易日历，目前支持"SH"
+     * @param query
+     * @param market
+     * @return DatetimeList
+     */
     DatetimeList getTradingCalendar(const KQuery& query, const string& market = "SH");
+
+    /**
+     * 获取10年期中国国债收益率
+     */
+    const ZhBond10List& getZhBond10() const;
 
     /**
      * 判断指定日期是否为节假日
@@ -185,6 +196,20 @@ public:
         return m_thread_id;
     }
 
+    bool runningInPython() const {
+        return m_runningInPython;
+    }
+
+    void runningInPython(bool inpython) {
+        m_runningInPython = inpython;
+    }
+
+    bool pythonInJupyter() const {
+        return m_pythonInJupyter;
+    }
+
+    void pythonInJupyter(bool inJupyter);
+
 public:
     typedef StockMapIterator const_iterator;
     const_iterator begin() const {
@@ -216,12 +241,17 @@ private:
     /* 加载所有权息数据 */
     void loadAllStockWeights();
 
+    /** 加载10年期中国国债收益率数据 */
+    void loadAllZhBond10();
+
 private:
     StockManager();
 
 private:
     static StockManager* m_sm;
-    bool m_initializing;
+    std::atomic_bool m_initializing;
+    std::atomic_bool m_runningInPython;  // 是否是在 python 中运行
+    std::atomic_bool m_pythonInJupyter;  // python 是否为交互模式
     std::thread::id m_thread_id;  // 记录线程id，用于判断Stratege是以独立进程方式还是线程方式运行
     string m_tmpdir;
     string m_datadir;
@@ -241,6 +271,8 @@ private:
 
     std::unordered_set<Datetime> m_holidays;  // 节假日
     std::mutex* m_holidays_mutex;
+
+    ZhBond10List m_zh_bond10;  // 10年期中国国债收益率数据
 
     Parameter m_baseInfoDriverParam;
     Parameter m_blockDriverParam;

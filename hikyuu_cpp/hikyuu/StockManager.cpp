@@ -33,7 +33,8 @@ void StockManager::quit() {
     }
 }
 
-StockManager::StockManager() : m_initializing(false) {
+StockManager::StockManager()
+: m_initializing(false), m_runningInPython(false), m_pythonInJupyter(false) {
     m_stockDict_mutex = new std::mutex;
     m_marketInfoDict_mutex = new std::mutex;
     m_stockTypeInfo_mutex = new std::mutex;
@@ -53,6 +54,11 @@ StockManager& StockManager::instance() {
         m_sm = new StockManager();
     }
     return (*m_sm);
+}
+
+void StockManager::pythonInJupyter(bool inJupyter) {
+    m_pythonInJupyter = inJupyter;
+    initLogger(inJupyter);
 }
 
 Parameter default_preload_param() {
@@ -124,6 +130,7 @@ void StockManager::init(const Parameter& baseInfoParam, const Parameter& blockPa
     loadAllStockTypeInfo();
     loadAllStocks();
     loadAllStockWeights();
+    loadAllZhBond10();
 
     // 获取板块驱动
     m_blockDriver = DataDriverFactory::getBlockDriver(blockParam);
@@ -271,6 +278,7 @@ void StockManager::reload() {
     loadAllStockTypeInfo();
     loadAllStocks();
     loadAllStockWeights();
+    loadAllZhBond10();
 
     m_blockDriver->load();
 
@@ -386,6 +394,10 @@ DatetimeList StockManager::getTradingCalendar(const KQuery& query, const string&
       .getDatetimeList(query);
 }
 
+const ZhBond10List& StockManager::getZhBond10() const {
+    return m_zh_bond10;
+}
+
 Stock StockManager::addTempCsvStock(const string& code, const string& day_filename,
                                     const string& min_filename, price_t tick, price_t tickValue,
                                     int precision, size_t minTradeNumber, size_t maxTradeNumber) {
@@ -469,10 +481,11 @@ void StockManager::loadAllStocks() {
         } catch (...) {
             endDate = Null<Datetime>();
         }
-        Stock _stock(info.market, info.code, info.name, info.type, info.valid, startDate,
-                    endDate, info.tick, info.tickValue, info.precision, info.minTradeNumber,
-                    info.maxTradeNumber);
-        string market_code = _stock.market_code();;
+        Stock _stock(info.market, info.code, info.name, info.type, info.valid, startDate, endDate,
+                     info.tick, info.tickValue, info.precision, info.minTradeNumber,
+                     info.maxTradeNumber);
+        string market_code = _stock.market_code();
+        ;
         to_upper(market_code);
         auto iter = m_stockDict.find(market_code);
         if (iter == m_stockDict.end()) {
@@ -544,6 +557,10 @@ void StockManager::loadAllStockWeights() {
             stock.m_data->m_weightList.swap(weight_iter->second);
         }
     }
+}
+
+void StockManager::loadAllZhBond10() {
+    m_zh_bond10 = m_baseInfoDriver->getAllZhBond10();
 }
 
 }  // namespace hku

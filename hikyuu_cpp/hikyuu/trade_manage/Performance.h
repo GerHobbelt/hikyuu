@@ -57,7 +57,9 @@ public:
     void statistics(const TradeManagerPtr& tm, const Datetime& datetime = Datetime::now());
 
     /** 获取所有统计项名称，顺序与 values 相同 */
-    StringList names() const;
+    const StringList& names() const {
+        return ms_keys;
+    }
 
     /** 获取所有统计项值，顺序与 names 相同*/
     PriceList values() const;
@@ -68,6 +70,7 @@ public:
 
 private:
     map_type m_result;
+    static StringList ms_keys;  // 保存统计项顺序, map/unordered_map都不能保持按插入顺序遍历
 };
 
 } /* namespace hku */

@@ -94,115 +94,16 @@ void export_System(py::module& m) {
       .def_property("name", py::overload_cast<>(&System::name, py::const_),
                     py::overload_cast<const string&>(&System::name), py::return_value_policy::copy,
                     "系统名称")
-      .def_property(
-        "tm", &System::getTM,
-        [](SystemPtr& self, py::object pg) {
-            TradeManagerPtr x;
-            if (!pg.is_none()) {
-                x = pg.cast<TradeManagerPtr>();
-            }
-            self->setTM(x);
-        },
-        "关联的交易管理实例")
-
-      .def_property(
-        "to", &System::getTO,
-        [](SystemPtr& self, py::object pg) {
-            KData x;
-            if (!pg.is_none()) {
-                x = pg.cast<KData>();
-            }
-            self->setTO(x);
-        },
-        "交易对象 KData")
-
-      .def_property(
-        "mm", &System::getMM,
-        [](SystemPtr& self, py::object pg) {
-            MoneyManagerPtr x;
-            if (!pg.is_none()) {
-                x = pg.cast<MoneyManagerPtr>();
-            }
-            self->setMM(x);
-        },
-        "资金管理策略")
-
-      .def_property(
-        "ev", &System::getEV,
-        [](SystemPtr& self, py::object pg) {
-            EnvironmentPtr x;
-            if (!pg.is_none()) {
-                x = pg.cast<EnvironmentPtr>();
-            }
-            self->setEV(x);
-        },
-        "市场环境判断策略")
-
-      .def_property(
-        "cn", &System::getCN,
-        [](SystemPtr& self, py::object pg) {
-            ConditionPtr x;
-            if (!pg.is_none()) {
-                x = pg.cast<ConditionPtr>();
-            }
-            self->setCN(x);
-        },
-        "系统有效条件")
-
-      .def_property(
-        "sg", &System::getSG,
-        [](SystemPtr& self, py::object pg) {
-            SignalPtr x;
-            if (!pg.is_none()) {
-                x = pg.cast<SignalPtr>();
-            }
-            self->setSG(x);
-        },
-        "信号指示器")
-
-      .def_property(
-        "st", &System::getST,
-        [](SystemPtr& self, py::object pg) {
-            StoplossPtr x;
-            if (!pg.is_none()) {
-                x = pg.cast<StoplossPtr>();
-            }
-            self->setST(x);
-        },
-        "止损策略")
-
-      .def_property(
-        "tp", &System::getTP,
-        [](SystemPtr& self, py::object pg) {
-            StoplossPtr x;
-            if (!pg.is_none()) {
-                x = pg.cast<StoplossPtr>();
-            }
-            self->setTP(x);
-        },
-        "止盈策略")
-
-      .def_property(
-        "pg", &System::getPG,
-        [](SystemPtr& self, py::object pg) {
-            ProfitGoalPtr x;
-            if (!pg.is_none()) {
-                x = pg.cast<ProfitGoalPtr>();
-            }
-            self->setPG(x);
-        },
-        "盈利目标策略")
-
-      .def_property(
-        "sp", &System::getSP,
-        [](SystemPtr& self, py::object pg) {
-            SlippagePtr x;
-            if (!pg.is_none()) {
-                x = pg.cast<SlippagePtr>();
-            }
-            self->setSP(x);
-        },
-        "移滑价差算法")
+      .def_property("tm", &System::getTM, &System::setTM, "关联的交易管理实例")
+      .def_property("to", &System::getTO, &System::setTO, "交易对象 KData")
+      .def_property("mm", &System::getMM, &System::setMM, "资金管理策略")
+      .def_property("ev", &System::getEV, &System::setEV, "市场环境判断策略")
+      .def_property("cn", &System::getCN, &System::setCN, "系统有效条件")
+      .def_property("sg", &System::getSG, &System::setSG, "信号指示器")
+      .def_property("st", &System::getST, &System::setST, "止损策略")
+      .def_property("tp", &System::getTP, &System::setTP, "止盈策略")
+      .def_property("pg", &System::getPG, &System::setPG, "盈利目标策略")
+      .def_property("sp", &System::getSP, &System::setSP, "移滑价差算法")
 
       .def("get_param", &System::getParam<boost::any>, R"(get_param(self, name)
 
@@ -254,18 +155,20 @@ void export_System(py::module& m) {
       .def("get_buy_short_trade_request", &System::getBuyShortTradeRequest,
            py::return_value_policy::copy)
 
-      .def("reset", &System::reset, py::arg("with_tm"), py::arg("with_ev"),
-           R"(reset(self, with_tm, with_ev)
+      .def("reset", &System::reset,
+           R"(reset(self)
 
-    复位操作。TM、EV是和具体系统无关的策略组件，可以在不同的系统中进行共享，复位将引起系统运行时被重新清空并计算。尤其是在共享TM时需要注意！
+    依据各个部件的共享属性进行复位操作。)")
 
-    :param bool with_tm: 是否复位TM组件
-    :param bool with_ev: 是否复位EV组件)")
+      .def("force_reset_all", &System::forceResetAll,
+           R"(force_reset_all(self)
 
-      .def("clone", &System::clone, py::arg("with_tm") = true, py::arg("with_ev") = false,
+    忽略各个部件的共享属性，强制复位所有部件。)")
+
+      .def("clone", &System::clone,
            R"(clone(self)
 
-    克隆操作。)")
+    克隆操作，会依据部件的共享特性进行克隆，共享部件不进行实际的克隆操作，保持共享。)")
 
       .def("run", run_1, py::arg("query"), py::arg("reset") = true)
       .def("run", run_2, py::arg("kdata"), py::arg("reset") = true)

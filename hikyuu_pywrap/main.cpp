@@ -61,6 +61,13 @@ PYBIND11_MODULE(core312, m) {
 #else
 PYBIND11_MODULE(core, m) {
 #endif
+
+    StockManager::instance().runningInPython(true);
+
+#if HKU_ENABLE_SEND_FEEDBACK
+    sendPythonVersionFeedBack(PY_MAJOR_VERSION, PY_MINOR_VERSION, PY_MICRO_VERSION);
+#endif
+
     py::register_exception<hku::exception>(m, "HKUException");
 
     export_bind_stl(m);
