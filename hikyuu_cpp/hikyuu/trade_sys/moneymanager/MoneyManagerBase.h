@@ -20,7 +20,7 @@ namespace hku {
  * @ingroup MoneyManager
  */
 class HKU_API MoneyManagerBase : public enable_shared_from_this<MoneyManagerBase> {
-    PARAMETER_SUPPORT
+    PARAMETER_SUPPORT_WITH_CHECK
 
 public:
     MoneyManagerBase();
@@ -38,9 +38,7 @@ public:
     }
 
     /** 复位 */
-    void reset() {
-        _reset();
-    }
+    void reset();
 
     /**
      * 设定交易账户

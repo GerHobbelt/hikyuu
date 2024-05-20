@@ -30,7 +30,7 @@ namespace hku {
  * @ingroup System
  */
 class HKU_API System {
-    PARAMETER_SUPPORT
+    PARAMETER_SUPPORT_WITH_CHECK
 
 public:
     /** 默认构造函数 */
@@ -145,12 +145,12 @@ public:
     const TradeRequest& getBuyShortTradeRequest() const;
 
     /**
-     * 复位
+     * 复位，但不包括已有的交易对象，以及共享的部件
      * @note 实际复位操作依赖于系统中各个部件的共享参数
      */
     void reset();
 
-    /** 强制复位所有组件，忽略组件的共享属性 */
+    /** 强制复位所有组件以及清空已有的交易对象，忽略组件的共享属性 */
     void forceResetAll();
 
     typedef shared_ptr<System> SystemPtr;
@@ -169,24 +169,27 @@ public:
     /**
      * @brief 不指定stock的方式下run，需要事先通过setStock设定stock
      * @param query 查询条件
-     * @param reset 执行前是否先复位
+     * @param reset 执行前是否依据系统部件共享属性复位
+     * @param resetAll 强制复位所有部件
      */
-    void run(const KQuery& query, bool reset = true);
+    void run(const KQuery& query, bool reset = true, bool resetAll = false);
 
     /**
      * @brief 运行系统策略
      * @param stock 指定的证券
      * @param query 指定查询条件
-     * @param reset 执行前是否复位
+     * @param reset 执行前是否依据系统部件共享属性复位
+     * @param resetAll 强制复位所有部件
      */
-    void run(const Stock& stock, const KQuery& query, bool reset = true);
+    void run(const Stock& stock, const KQuery& query, bool reset = true, bool resetAll = false);
 
     /**
      * @brief 运行系统
      * @param kdata 指定的交易对象
-     * @param reset 执行前是否复位
+     * @param reset 执行前是否依据系统部件共享属性复位
+     * @param resetAll 强制复位所有部件
      */
-    void run(const KData& kdata, bool reset = true);
+    void run(const KData& kdata, bool reset = true, bool resetAll = false);
 
     /**
      * @brief 在指定的日期执行一步，仅由 PF 调用
@@ -208,8 +211,22 @@ public:
         return _sell(today, src_today, from);
     }
 
-    // 强制卖出，用于资金分配管理器和资产组合指示系统进行强制卖出操作
-    TradeRecord sellForce(const KRecord& today, const KRecord& src_today, double num, Part from);
+    // 强制以开盘价卖出，仅供 PF/AF 内部调用
+    TradeRecord sellForceOnOpen(const Datetime& date, double num, Part from) {
+        HKU_ASSERT(from == PART_ALLOCATEFUNDS || from == PART_PORTFOLIO);
+        return _sellForce(date, num, from, true);
+    }
+
+    // 强制以收盘价卖出，仅供 PF/AF 内部调用
+    TradeRecord sellForceOnClose(const Datetime& date, double num, Part from) {
+        HKU_ASSERT(from == PART_ALLOCATEFUNDS || from == PART_PORTFOLIO);
+        return _sellForce(date, num, from, false);
+    }
+
+    // 由各个相关组件调用，用于组件参数变化时通知 sys，以便重算
+    void partChangedNotify() {
+        m_calculated = false;
+    }
 
 private:
     bool _environmentIsValid(const Datetime& datetime);
@@ -261,6 +278,9 @@ private:
 
     TradeRecord _runMoment(const KRecord& record, const KRecord& src_record);
 
+    // Portfolio | AllocateFunds 指示立即进行强制卖出，以便对 buy_delay 的系统进行资金调整
+    TradeRecord _sellForce(const Datetime& date, double num, Part from, bool on_open);
+
 protected:
     TradeManagerPtr m_tm;
     MoneyManagerPtr m_mm;
@@ -277,6 +297,7 @@ protected:
     KData m_kdata;
     KData m_src_kdata;  // 未复权的原始 K 线数据
 
+    bool m_calculated;  // 控制是否需要重新计算
     bool m_pre_ev_valid;
     bool m_pre_cn_valid;
 
@@ -318,6 +339,7 @@ private:
         // m_kdata中包含了stock和query的信息，不用保存m_stock
         ar& BOOST_SERIALIZATION_NVP(m_kdata);
 
+        ar& BOOST_SERIALIZATION_NVP(m_calculated);
         ar& BOOST_SERIALIZATION_NVP(m_pre_ev_valid);
         ar& BOOST_SERIALIZATION_NVP(m_pre_cn_valid);
 
@@ -352,6 +374,7 @@ private:
         ar& BOOST_SERIALIZATION_NVP(m_kdata);
         m_stock = m_kdata.getStock();
 
+        ar& BOOST_SERIALIZATION_NVP(m_calculated);
         ar& BOOST_SERIALIZATION_NVP(m_pre_ev_valid);
         ar& BOOST_SERIALIZATION_NVP(m_pre_cn_valid);
 
@@ -431,39 +454,66 @@ inline SlippagePtr System::getSP() const {
 }
 
 inline void System::setTM(const TradeManagerPtr& tm) {
-    m_tm = tm;
+    if (m_tm != tm) {
+        m_tm = tm;
+        m_calculated = false;
+    }
 }
 
 inline void System::setMM(const MoneyManagerPtr& mm) {
-    m_mm = mm;
+    if (m_mm != mm) {
+        m_mm = mm;
+        m_calculated = false;
+    }
 }
 
 inline void System::setEV(const EnvironmentPtr& ev) {
-    m_ev = ev;
+    if (m_ev != ev) {
+        m_ev = ev;
+        m_calculated = false;
+    }
 }
 
 inline void System::setCN(const ConditionPtr& cn) {
-    m_cn = cn;
+    if (m_cn != cn) {
+        m_cn = cn;
+        m_calculated = false;
+    }
 }
 
 inline void System::setSG(const SignalPtr& sg) {
-    m_sg = sg;
+    if (m_sg != sg) {
+        m_sg = sg;
+        m_calculated = false;
+    }
 }
 
 inline void System::setST(const StoplossPtr& st) {
-    m_st = st;
+    if (m_st != st) {
+        m_st = st;
+        m_calculated = false;
+    }
 }
 
 inline void System::setTP(const StoplossPtr& tp) {
-    m_tp = tp;
+    if (m_tp != tp) {
+        m_tp = tp;
+        m_calculated = false;
+    }
 }
 
 inline void System::setPG(const ProfitGoalPtr& pg) {
-    m_pg = pg;
+    if (m_pg != pg) {
+        m_pg = pg;
+        m_calculated = false;
+    }
 }
 
 inline void System::setSP(const SlippagePtr& sp) {
-    m_sp = sp;
+    if (m_sp != sp) {
+        m_sp = sp;
+        m_calculated = false;
+    }
 }
 
 inline Stock System::getStock() const {
@@ -471,7 +521,10 @@ inline Stock System::getStock() const {
 }
 
 inline void System::setStock(const Stock& stk) {
-    m_stock = stk;
+    if (m_stock != stk) {
+        m_stock = stk;
+        m_calculated = false;
+    }
 }
 
 inline const TradeRecordList& System::getTradeRecordList() const {

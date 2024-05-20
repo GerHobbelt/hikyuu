@@ -35,6 +35,22 @@ Indicator (*VOL3)() = VOL;
 Indicator (*KDATA_PART1)(const KData& kdata, const string& part) = KDATA_PART;
 Indicator (*KDATA_PART3)(const string& part) = KDATA_PART;
 
+Indicator (*RECOVER_FORWARD_1)() = RECOVER_FORWARD;
+Indicator (*RECOVER_FORWARD_2)(const Indicator&) = RECOVER_FORWARD;
+Indicator (*RECOVER_FORWARD_3)(const KData&) = RECOVER_FORWARD;
+
+Indicator (*RECOVER_BACKWARD_1)() = RECOVER_BACKWARD;
+Indicator (*RECOVER_BACKWARD_2)(const Indicator&) = RECOVER_BACKWARD;
+Indicator (*RECOVER_BACKWARD_3)(const KData&) = RECOVER_BACKWARD;
+
+Indicator (*RECOVER_EQUAL_FORWARD_1)() = RECOVER_EQUAL_FORWARD;
+Indicator (*RECOVER_EQUAL_FORWARD_2)(const Indicator&) = RECOVER_EQUAL_FORWARD;
+Indicator (*RECOVER_EQUAL_FORWARD_3)(const KData&) = RECOVER_EQUAL_FORWARD;
+
+Indicator (*RECOVER_EQUAL_BACKWARD_1)() = RECOVER_EQUAL_BACKWARD;
+Indicator (*RECOVER_EQUAL_BACKWARD_2)(const Indicator&) = RECOVER_EQUAL_BACKWARD;
+Indicator (*RECOVER_EQUAL_BACKWARD_3)(const KData&) = RECOVER_EQUAL_BACKWARD;
+
 Indicator (*DATE1)() = hku::DATE;
 Indicator (*DATE2)(const KData&) = hku::DATE;
 
@@ -539,6 +555,42 @@ void export_Indicator_build_in(py::module& m) {
 
     :param data: 输入数据（KData 或 Indicator） 
     :param string kpart: KDATA|OPEN|HIGH|LOW|CLOSE|AMO|VOL
+    :rtype: Indicator)");
+
+    m.def("RECOVER_FORWARD", RECOVER_FORWARD_1);
+    m.def("RECOVER_FORWARD", RECOVER_FORWARD_2);
+    m.def("RECOVER_FORWARD", RECOVER_FORWARD_3, R"(RECOVER_FORWARD([data])
+    
+    对输入的指标数据 (CLOSE|OPEN|HIGH|LOW) 进行前向复权
+
+    :param Indicator|KData data: 只接受 CLOSE|OPEN|HIGH|LOW 指标，或 KData（此时默认使用 KData 的收盘价）
+    :rtype: Indicator)");
+
+    m.def("RECOVER_BACKWARD", RECOVER_BACKWARD_1);
+    m.def("RECOVER_BACKWARD", RECOVER_BACKWARD_2);
+    m.def("RECOVER_BACKWARD", RECOVER_BACKWARD_3, R"(RECOVER_BACKWARD([data])
+    
+    对输入的指标数据 (CLOSE|OPEN|HIGH|LOW) 进行后向复权
+
+    :param Indicator|KData data: 只接受 CLOSE|OPEN|HIGH|LOW 指标，或 KData（此时默认使用 KData 的收盘价）
+    :rtype: Indicator)");
+
+    m.def("RECOVER_EQUAL_FORWARD", RECOVER_EQUAL_FORWARD_1);
+    m.def("RECOVER_EQUAL_FORWARD", RECOVER_EQUAL_FORWARD_2);
+    m.def("RECOVER_EQUAL_FORWARD", RECOVER_EQUAL_FORWARD_3, R"(RECOVER_EQUAL_FORWARD([data])
+    
+    对输入的指标数据 (CLOSE|OPEN|HIGH|LOW) 进行等比前向复权
+
+    :param Indicator|KData data: 只接受 CLOSE|OPEN|HIGH|LOW 指标，或 KData（此时默认使用 KData 的收盘价）
+    :rtype: Indicator)");
+
+    m.def("RECOVER_EQUAL_BACKWARD", RECOVER_EQUAL_BACKWARD_1);
+    m.def("RECOVER_EQUAL_BACKWARD", RECOVER_EQUAL_BACKWARD_2);
+    m.def("RECOVER_EQUAL_BACKWARD", RECOVER_EQUAL_BACKWARD_3, R"(RECOVER_EQUAL_BACKWARD([data])
+    
+    对输入的指标数据 (CLOSE|OPEN|HIGH|LOW) 进行等比后向复权
+
+    :param Indicator|KData data: 只接受 CLOSE|OPEN|HIGH|LOW 指标，或 KData（此时默认使用 KData 的收盘价）
     :rtype: Indicator)");
 
     m.def("DATE", DATE1);
@@ -1687,36 +1739,59 @@ void export_Indicator_build_in(py::module& m) {
 
     m.def(
       "IC",
-      [](const Indicator& ind, const py::object& stks, const KQuery& query, int n,
-         const Stock& ref_stk) {
+      [](const Indicator& ind, const py::object& stks, const KQuery& query, const Stock& ref_stk,
+         int n) {
           if (py::isinstance<Block>(stks)) {
               const auto& blk = stks.cast<Block&>();
-              return IC(ind, blk, query, n, ref_stk);
+              return IC(ind, blk, query, ref_stk, n);
           }
 
           if (py::isinstance<py::sequence>(stks)) {
               StockList c_stks = python_list_to_vector<Stock>(stks);
-              return IC(ind, c_stks, query, n, ref_stk);
+              return IC(ind, c_stks, query, ref_stk, n);
           }
 
           HKU_THROW("Input stks must be Block or sequenc(Stock)!");
       },
-      py::arg("ind"), py::arg("stks"), py::arg("query"), py::arg("n"), py::arg("ref_stk"),
-      R"(IC(ind, stks, query, n, ref_stk)
+      py::arg("ind"), py::arg("stks"), py::arg("query"), py::arg("ref_stk"), py::arg("n") = 1,
+      R"(IC(ind, stks, query, ref_stk[, n=1])
 
     计算指定的因子相对于参考证券的 IC （实际为 RankIC）
     
+    :param Indicator ind: 输入因子
     :param sequence(stock)|Block stks 证券组合
     :param Query query: 查询条件
-    :param int n: 时间窗口
-    :param Stock ref_stk: 参照证券，通常使用 sh000300 沪深300)");
+    :param Stock ref_stk: 参照证券，通常使用 sh000300 沪深300
+    :param int n: 时间窗口)");
 
-    m.def("ICIR", ICIR, py::arg("ic"), py::arg("n") = 10, R"(ICIR(ic[,n])
+    m.def(
+      "ICIR",
+      [](const Indicator& ind, const py::object& stks, const KQuery& query, const Stock& ref_stk,
+         int n, int rolling_n) {
+          if (py::isinstance<Block>(stks)) {
+              const auto& blk = stks.cast<Block&>();
+              return ICIR(ind, blk, query, ref_stk, n, rolling_n);
+          }
+
+          if (py::isinstance<py::sequence>(stks)) {
+              StockList c_stks = python_list_to_vector<Stock>(stks);
+              return ICIR(ind, c_stks, query, ref_stk, n, rolling_n);
+          }
+
+          HKU_THROW("Input stks must be Block or sequenc(Stock)!");
+      },
+      py::arg("ind"), py::arg("stks"), py::arg("query"), py::arg("ref_stk"), py::arg("n") = 1,
+      py::arg("rolling_n") = 120,
+      R"(ICIR(ind, stks, query, ref_stk[, n=1, rolling_n=120])
 
     计算 IC 因子 IR = IC的多周期均值/IC的标准方差
 
-    :param Indicator: ic 已经计算出的 ic 值
-    :param int n: 时间窗口)");
+    :param Indicator ind: 输入因子
+    :param sequence(stock)|Block stks 证券组合
+    :param Query query: 查询条件
+    :param Stock ref_stk: 参照证券，通常使用 sh000300 沪深300
+    :param int n: 计算IC时对应的 n 日收益率
+    :param int rolling_n: 滚动周期)");
 
     m.def("ZSCORE", ZSCORE_1, py::arg("out_extreme") = false, py::arg("nsigma") = 3.0,
           py::arg("recursive") = false);

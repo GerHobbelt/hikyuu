@@ -15,14 +15,16 @@ BOOST_CLASS_EXPORT(hku::IEma)
 
 namespace hku {
 
-IEma::IEma() : IndicatorImp("IEma", 1) {
+IEma::IEma() : IndicatorImp("EMA", 1) {
     setParam<int>("n", 22);
 }
 
 IEma::~IEma() {}
 
-bool IEma::check() {
-    return getParam<int>("n") > 0;
+void IEma::_checkParam(const string& name) const {
+    if ("n" == name) {
+        HKU_ASSERT(getParam<int>("n") > 0);
+    }
 }
 
 void IEma::_calculate(const Indicator& indicator) {

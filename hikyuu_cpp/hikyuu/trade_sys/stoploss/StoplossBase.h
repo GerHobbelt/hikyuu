@@ -21,7 +21,7 @@ namespace hku {
  * @ingroup Stoploss
  */
 class HKU_API StoplossBase : public enable_shared_from_this<StoplossBase> {
-    PARAMETER_SUPPORT
+    PARAMETER_SUPPORT_WITH_CHECK
 
 public:
     StoplossBase();
@@ -183,10 +183,6 @@ inline void StoplossBase::setTM(const TradeManagerPtr& tm) {
 
 inline KData StoplossBase::getTO() const {
     return m_kdata;
-}
-
-inline void StoplossBase::reset() {
-    _reset();
 }
 
 } /* namespace hku */

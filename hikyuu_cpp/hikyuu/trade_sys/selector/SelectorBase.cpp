@@ -6,7 +6,6 @@
  */
 
 #include "SelectorBase.h"
-#include "../portfolio/Portfolio.h"
 
 namespace hku {
 
@@ -36,6 +35,9 @@ SelectorBase::SelectorBase(const string& name) : m_name(name) {
 }
 
 SelectorBase::~SelectorBase() {}
+
+void SelectorBase::baseCheckParam(const string& name) const {}
+void SelectorBase::paramChanged() {}
 
 void SelectorBase::removeAll() {
     m_pro_sys_list = SystemList();
@@ -68,14 +70,23 @@ SelectorPtr SelectorBase::clone() {
 
     p->m_params = m_params;
     p->m_name = m_name;
-    p->m_real_sys_list = m_real_sys_list;
-    p->m_pro_sys_list = m_pro_sys_list;
+
+    p->m_real_sys_list.reserve(m_real_sys_list.size());
+    for (const auto& sys : m_real_sys_list) {
+        p->m_real_sys_list.emplace_back(sys->clone());
+    }
+
+    p->m_pro_sys_list.reserve(m_pro_sys_list.size());
+    for (const auto& sys : m_real_sys_list) {
+        p->m_pro_sys_list.emplace_back(sys->clone());
+    }
     return p;
 }
 
 void SelectorBase::calculate(const SystemList& sysList, const KQuery& query) {
     m_real_sys_list = sysList;
     if (getParam<bool>("run_proto_sys")) {
+        // 用于手工测试
         for (auto& sys : m_pro_sys_list) {
             sys->run(query);
         }
@@ -100,7 +111,7 @@ bool SelectorBase::addStock(const Stock& stock, const SystemPtr& protoSys) {
 bool SelectorBase::addStockList(const StockList& stkList, const SystemPtr& protoSys) {
     HKU_ERROR_IF_RETURN(!protoSys, false, "Try add Null protoSys, will be discard!");
     HKU_ERROR_IF_RETURN(!protoSys->getMM(), false, "protoSys has not MoneyManager!");
-    HKU_ERROR_IF_RETURN(!protoSys->getSG(), false, "protoSys has not Siganl!");
+    HKU_ERROR_IF_RETURN(!protoSys->getSG(), false, "protoSys has not Signal!");
     SYSPtr newProtoSys = protoSys->clone();
     // 复位清除之前的数据，避免因原有数据过多导致下面循环时速度过慢
     // 每个系统独立，不共享 tm

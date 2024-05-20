@@ -448,23 +448,26 @@
     :param KData kdata: k线数据
     :rtype: Indicator
     
-.. py:function:: IC(ind, stks, query, n, ref_stk)
+.. py:function:: IC(ind, stks, query, ref_stk[, n=1])
 
     计算指定的因子相对于参考证券的 IC （实际为 RankIC）
     
-    :param sequence(stock)|Block stks 证券组合
+    :param sequence | Block stks 证券组合
     :param Query query: 查询条件
-    :param int n: 时间窗口
     :param Stock ref_stk: 参照证券，通常使用 sh000300 沪深300
+    :param int n: 时间窗口(对应的 n 日收益率)
     :rtype: Indicator
 
 
-.. py:function:: ICIR(ic[,n])
+.. py:function:: ICIR(ind, stks, query, ref_stk[, n=1, rolling_n=120])
 
     计算 IC 因子 IR = IC的多周期均值/IC的标准方差
 
-    :param Indicator: ic 已经计算出的 ic 值
-    :param int n: 时间窗口
+    :param sequence | Block stks 证券组合
+    :param Query query: 查询条件
+    :param Stock ref_stk: 参照证券，通常使用 sh000300 沪深300
+    :param int n: 时间窗口(对应的 n 日收益率)
+    :param int rolling_n: 滚动周期
     :rtype: Indicator
 
 
@@ -758,6 +761,38 @@
     
     :param Indicator data: 输入数据
     :param int n: 引用n周期前的值，即右移n位
+    :rtype: Indicator
+
+
+.. py:function:: RECOVER_BACKWARD([data])
+
+    对输入的指标数据 (CLOSE|OPEN|HIGH|LOW) 进行后向复权
+
+    :param Indicator|KData data: 只接受 CLOSE|OPEN|HIGH|LOW 指标，或 KData（此时默认使用 KData 的收盘价）
+    :rtype: Indicator
+
+
+.. py:function:: RECOVER_FORWARD([data])
+
+    对输入的指标数据 (CLOSE|OPEN|HIGH|LOW) 进行前向复权
+
+    :param Indicator|KData data: 只接受 CLOSE|OPEN|HIGH|LOW 指标，或 KData（此时默认使用 KData 的收盘价）
+    :rtype: Indicator
+
+
+.. py:function:: RECOVER_EQUAL_BACKWARD([data])
+
+    对输入的指标数据 (CLOSE|OPEN|HIGH|LOW) 进行等比后向复权
+
+    :param Indicator|KData data: 只接受 CLOSE|OPEN|HIGH|LOW 指标，或 KData（此时默认使用 KData 的收盘价）
+    :rtype: Indicator
+
+
+.. py:function:: RECOVER_EQUAL_FORWARD([data])
+
+    对输入的指标数据 (CLOSE|OPEN|HIGH|LOW) 进行等比前向复权
+
+    :param Indicator|KData data: 只接受 CLOSE|OPEN|HIGH|LOW 指标，或 KData（此时默认使用 KData 的收盘价）
     :rtype: Indicator
 
 

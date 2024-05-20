@@ -21,7 +21,7 @@ MySQLKDataDriver::~MySQLKDataDriver() {
 }
 
 bool MySQLKDataDriver::_init() {
-    HKU_ASSERT_M(m_connect == nullptr, "Maybe repeat initialization!");
+    HKU_CHECK(m_connect == nullptr, "Maybe repeat initialization!");
     Parameter connect_param;
     connect_param.set<string>("db", "");  // 数据库名称须在SQL语句中明确指定
     connect_param.set<string>("host", getParamFromOther<string>(m_params, "host", "127.0.0.1"));
@@ -294,7 +294,7 @@ TransList MySQLKDataDriver::_getTransListByDate(const string& market, const stri
         SQLStatementPtr st = m_connect->getStatement(
           fmt::format("select `date`, `price`, `vol`, `buyorsell` from {} where date >= {} and "
                       "date < {} order by date",
-                      table, query.startDatetime().number(), query.endDatetime().number()));
+                      table, query.startDatetime().ymdhms(), query.endDatetime().ymdhms()));
 
         m_connect->transaction();
         st->exec();

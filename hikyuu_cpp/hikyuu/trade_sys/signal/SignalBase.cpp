@@ -36,6 +36,9 @@ SignalBase::SignalBase(const string& name) : m_name(name), m_hold_long(false), m
 
 SignalBase::~SignalBase() {}
 
+void SignalBase::baseCheckParam(const string& name) const {}
+void SignalBase::paramChanged() {}
+
 SignalPtr SignalBase::clone() {
     SignalPtr p;
     try {
@@ -61,7 +64,7 @@ SignalPtr SignalBase::clone() {
 }
 
 void SignalBase::setTO(const KData& kdata) {
-    reset();
+    HKU_IF_RETURN(m_kdata == kdata, void());
     m_kdata = kdata;
     if (!kdata.empty()) {
         _calculate();
@@ -69,6 +72,7 @@ void SignalBase::setTO(const KData& kdata) {
 }
 
 void SignalBase::reset() {
+    m_kdata = Null<KData>();
     m_buySig.clear();
     m_sellSig.clear();
     m_hold_long = false;
