@@ -6,7 +6,7 @@ target("hikyuu")
         set_kind("shared")
     end
 
-    add_options("feedback")
+    add_options("hdf5", "mysql", "sqlite", "tdx", "feedback", "stackstrace")
 
     add_packages("boost", "fmt", "spdlog", "flatbuffers", "nng", "nlohmann_json", "cpp-httplib")
     if is_plat("windows", "linux", "cross") then
@@ -28,7 +28,7 @@ target("hikyuu")
         add_cxflags("-wd4267")
         add_cxflags("-wd4834") -- C++17 discarding return value of function with 'nodiscard' attribute
         add_cxflags("-wd4244") -- discable double to int
-        add_syslinks("bcrypt")
+        add_links("bcrypt")
     else
         add_rpathdirs("$ORIGIN")
         add_cxflags("-Wno-sign-compare", "-Wno-missing-braces")
@@ -37,53 +37,69 @@ target("hikyuu")
     if is_plat("windows") then
         if is_mode("release") then
             add_defines("HKU_API=__declspec(dllexport)")
-            add_packages("hdf5")
-        else
-            add_packages("hdf5_D")
         end
-        add_packages("mysql")
+        if get_config("hdf5") then
+            if is_mode("release") then
+                add_packages("hdf5")
+            else
+                add_packages("hdf5_D")
+            end
+        end
+        if get_config("mysql") then
+            add_packages("mysql")
+        end
     end
 
     if is_plat("linux", "cross") then
-        add_packages("hdf5", "mysql", "boost")
+        if get_config("hdf5") then
+            add_packages("hdf5")
+        end
+        if get_config("mysql") then
+            add_packages("mysql")
+        end
     end
 
     if is_plat("macosx") then
-        -- add_linkdirs("/usr/local/opt/libiconv/lib")
-        add_links("iconv")
-        add_includedirs("/usr/local/opt/hdf5/include")
-        add_linkdirs("/usr/local/opt/hdf5/lib")
-        add_links("hdf5", "hdf5_cpp")
-        if os.exists("/usr/local/opt/mysql-client") then
-            add_includedirs("/usr/local/opt/mysql-client/include")
-            add_linkdirs("/usr/local/opt/mysql-client/lib")
-            add_rpathdirs("/usr/local/opt/mysql-client/lib")
+        add_links("iconv", "sqlite3")
+        if get_config("mysql") then
+            add_packages("mysqlclient")
         end
-        if os.exists("/usr/local/mysql/lib") then
-            add_includedirs("/usr/local/include")
-            add_linkdirs("/usr/local/mysql/lib")
-            add_rpathdirs("/usr/local/mysql/lib")
+        if get_config("hdf5") then
+            add_includedirs("/usr/local/opt/hdf5/include")
+            add_linkdirs("/usr/local/opt/hdf5/lib")
+            add_links("hdf5", "hdf5_cpp")
         end
-        add_links("mysqlclient")
-        add_links("sqlite3")
     end
-
-    -- add files
-    add_files("./**.cpp")
 
     add_headerfiles("../(hikyuu/**.h)|**doc.h")
 
-    before_build(function(target)
-        if is_plat("macosx") then
-            if not os.exists("/usr/local/include/mysql") then
-                if os.exists("/usr/local/mysql/include") then
-                    os.run("ln -s /usr/local/mysql/include /usr/local/include/mysql")
-                else
-                    print("Not Found MySQL include dir!")
-                end
-            end
-        end
-    end)
+    -- add files
+    add_files("./**.cpp|data_driver/**.cpp|utilities/db_connect/mysql/*.cpp")
+    add_files("./data_driver/*.cpp")
+    if get_config("hdf5") or get_config("sqlite") then
+        add_files("./data_driver/base_info/sqlite/**.cpp")
+    end
+    if get_config("mysql") then
+        add_files("./data_driver/base_info/mysql/**.cpp")
+    end
+    add_files("./data_driver/block_info/**.cpp")
+    add_files("./data_driver/kdata/cvs/**.cpp")
+    if get_config("sqlite") then
+        add_files("./data_driver/kdata/sqlite/**.cpp")
+    end
+    if get_config("hdf5") then
+        add_files("./data_driver/kdata/hdf5/**.cpp")
+    end
+    if get_config("mysql") then
+        add_files("./data_driver/kdata/mysql/**.cpp")
+    end
+    if get_config("tdx") then
+        add_files("./data_driver/kdata/tdx/**.cpp")
+    end
+
+    if get_config("mysql") then
+        add_files("./utilities/db_connect/mysql/**.cpp")
+    end
 
     after_build(function(target)
         -- 不同平台的库后缀名

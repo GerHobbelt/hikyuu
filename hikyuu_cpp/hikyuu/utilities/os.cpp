@@ -1,7 +1,7 @@
 /*
  * os.cpp
  *
- *  Copyright (c) 2019, Yihua
+ *  Copyright (c) 2019, hikyuu.org
  *
  *  Created on: 2019-12-19
  *      Author: fasiondog
@@ -33,7 +33,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include "arithmetic.h"
-#include "util.h"
 #include "hikyuu/Log.h"
 #include "os.h"
 

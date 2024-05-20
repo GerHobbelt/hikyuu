@@ -12,7 +12,6 @@
 #include <algorithm>
 #include "TradeManager.h"
 #include "../trade_sys/system/SystemPart.h"
-#include "../utilities/util.h"
 #include "../KData.h"
 
 namespace hku {
@@ -1066,6 +1065,20 @@ TradeRecord TradeManager::sellShort(const Datetime& datetime, const Stock& stock
         position.sellMoney = roundEx(position.sellMoney + money, precision);
     }
 
+    if (result.datetime > m_broker_last_datetime) {
+        list<OrderBrokerPtr>::const_iterator broker_iter = m_broker_list.begin();
+        Datetime realtime, nulltime;
+        for (; broker_iter != m_broker_list.end(); ++broker_iter) {
+            realtime =
+              (*broker_iter)->sell(datetime, stock.market(), stock.code(), realPrice, number);
+            if (realtime != nulltime && realtime > m_broker_last_datetime) {
+                m_broker_last_datetime = realtime;
+            }
+        }
+    }
+
+    _saveAction(result);
+
     return result;
 }
 
@@ -1126,9 +1139,23 @@ TradeRecord TradeManager::buyShort(const Datetime& datetime, const Stock& stock,
         m_short_position.erase(stock.id());
     }
 
+    if (result.datetime > m_broker_last_datetime) {
+        list<OrderBrokerPtr>::const_iterator broker_iter = m_broker_list.begin();
+        Datetime realtime, nulltime;
+        for (; broker_iter != m_broker_list.end(); ++broker_iter) {
+            realtime =
+              (*broker_iter)->buy(datetime, stock.market(), stock.code(), realPrice, number);
+            if (realtime != nulltime && realtime > m_broker_last_datetime) {
+                m_broker_last_datetime = realtime;
+            }
+        }
+    }
+
     if (getParam<bool>("support_borrow_stock")) {
         returnStock(datetime, stock, realPrice, real_number);
     }
+
+    _saveAction(result);
 
     return result;
 }

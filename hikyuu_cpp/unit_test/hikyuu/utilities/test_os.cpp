@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) Yihua
+ *  Copyright (c) hikyuu.org
  *
  *  Created on: 2020-8-4
  *      Author: fasiondog
@@ -9,7 +9,6 @@
 #include <doctest/doctest.h>
 #include <hikyuu/Log.h>
 #include <hikyuu/utilities/os.h>
-#include <hikyuu/utilities/util.h>
 
 using namespace hku;
 
