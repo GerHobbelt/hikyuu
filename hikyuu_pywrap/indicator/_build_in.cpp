@@ -39,6 +39,30 @@ Indicator (*VOL3)() = VOL;
 Indicator (*KDATA_PART1)(const KData& kdata, const string& part) = KDATA_PART;
 Indicator (*KDATA_PART3)(const string& part) = KDATA_PART;
 
+Indicator (*DATE1)() = DATE;
+Indicator (*DATE2)(const KData&) = DATE;
+
+Indicator (*TIME1)() = TIME;
+Indicator (*TIME2)(const KData&) = TIME;
+
+Indicator (*YEAR1)() = YEAR;
+Indicator (*YEAR2)(const KData&) = YEAR;
+
+Indicator (*MONTH1)() = MONTH;
+Indicator (*MONTH2)(const KData&) = MONTH;
+
+Indicator (*WEEK1)() = WEEK;
+Indicator (*WEEK2)(const KData&) = WEEK;
+
+Indicator (*DAY1)() = DAY;
+Indicator (*DAY2)(const KData&) = DAY;
+
+Indicator (*HOUR1)() = HOUR;
+Indicator (*HOUR2)(const KData&) = HOUR;
+
+Indicator (*MINUTE1)() = MINUTE;
+Indicator (*MINUTE2)(const KData&) = MINUTE;
+
 // 太多选项选择的话，python中无法加载
 Indicator (*AMA_1)(int, int, int) = AMA;
 Indicator (*AMA_2)(const IndParam&, const IndParam&, const IndParam&) = AMA;
@@ -429,6 +453,12 @@ Indicator (*SLICE_3)(const Indicator&, int64_t, int64_t, int) = SLICE;
 Indicator (*RSI_1)(int) = RSI;
 Indicator (*RSI_2)(const Indicator&, int) = RSI;
 
+Indicator (*SLOPE1)(int) = SLOPE;
+Indicator (*SLOPE2)(const IndParam&) = SLOPE;
+Indicator (*SLOPE3)(const Indicator&, int) = SLOPE;
+Indicator (*SLOPE4)(const Indicator&, const IndParam&) = SLOPE;
+Indicator (*SLOPE5)(const Indicator&, const Indicator&) = SLOPE;
+
 void export_Indicator_build_in() {
     def("KDATA", KDATA1);
     def("KDATA", KDATA3, R"(KDATA([data])
@@ -493,6 +523,70 @@ void export_Indicator_build_in() {
 
     :param data: 输入数据（KData 或 Indicator） 
     :param string kpart: KDATA|OPEN|HIGH|LOW|CLOSE|AMO|VOL
+    :rtype: Indicator)");
+
+    def("DATE", DATE1);
+    def("DATE", DATE2, R"(DATE([data])
+
+    取得该周期从1900以来的年月日。用法: DATE 例如函数返回1000101，表示2000年1月1日。
+
+    :param data: 输入数据 KData
+    :rtype: Indicator)");
+
+    def("TIME", TIME1);
+    def("TIME", TIME2, R"(TIME([data])
+
+    取得该周期的时分秒。用法: TIME 函数返回有效值范围为(000000-235959)。
+
+    :param data: 输入数据 KData
+    :rtype: Indicator)");
+
+    def("YEAR", YEAR1);
+    def("YEAR", YEAR2, R"(YEAR([data])
+
+    取得该周期的年份。
+
+    :param data: 输入数据 KData
+    :rtype: Indicator)");
+
+    def("MONTH", MONTH1);
+    def("MONTH", MONTH2, R"(MONTH([data])
+
+    取得该周期的月份。用法: MONTH 函数返回有效值范围为(1-12)。
+
+    :param data: 输入数据 KData
+    :rtype: Indicator)");
+
+    def("WEEK", WEEK1);
+    def("WEEK", WEEK2, R"(WEEK([data])
+
+    取得该周期的星期数。用法：WEEK 函数返回有效值范围为(0-6)，0表示星期天。
+
+    :param data: 输入数据 KData
+    :rtype: Indicator)");
+
+    def("DAY", DAY1);
+    def("DAY", DAY2, R"(DAY([data])
+
+    取得该周期的日期。用法: DAY 函数返回有效值范围为(1-31)。
+
+    :param data: 输入数据 KData
+    :rtype: Indicator)");
+
+    def("HOUR", HOUR1);
+    def("HOUR", HOUR2, R"(HOUR([data])
+
+    取得该周期的小时数。用法：HOUR 函数返回有效值范围为(0-23)，对于日线及更长的分析周期值为0。
+
+    :param data: 输入数据 KData
+    :rtype: Indicator)");
+
+    def("MINUTE", MINUTE1);
+    def("MINUTE", MINUTE2, R"(MINUTE([data])
+
+    取得该周期的分钟数。用法：MINUTE 函数返回有效值范围为(0-59)，对于日线及更长的分析周期值为0。
+
+    :param data: 输入数据 KData
     :rtype: Indicator)");
 
     def("PRICELIST", PRICELIST2, (arg("data"), arg("discard") = 0));
@@ -1487,6 +1581,18 @@ void export_Indicator_build_in() {
     def("RSI", RSI_2, (arg("data"), arg("n") = 14), R"(RSI([data, n=14])
 
     相对强弱指数
+
+    :param Indicator data: 输入数据
+    :param int|Indicator|IndParam n: 时间窗口
+    :rtype: Indicator)");
+
+    def("SLOPE", SLOPE1, (arg("n") = 22));
+    def("SLOPE", SLOPE2, (arg("n")));
+    def("SLOPE", SLOPE3, (arg("data"), arg("n") = 22));
+    def("SLOPE", SLOPE4, (arg("data"), arg("n")));
+    def("SLOPE", SLOPE5, (arg("data"), arg("n")), R"(SLOPE([data, n=22])
+
+    计算线性回归斜率，N支持变量
 
     :param Indicator data: 输入数据
     :param int|Indicator|IndParam n: 时间窗口

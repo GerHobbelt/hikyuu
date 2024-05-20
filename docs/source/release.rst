@@ -1,6 +1,35 @@
 版本发布说明
 =======================
 
+1.3.0 - 2023年11月5日
+-------------------------
+
+1. 性能优化
+
+    `#125 <https://github.com/fasiondog/hikyuu/pull/125>`_ 指标融合优化，计算速度提升了8~10倍左右。
+
+2. 功能增强
+
+    - TradeManager 引出买空/买空操作至 python
+    - Stock 引出 get_index_range 方法至 python
+    - 编译选项增加 stacktrace 选项，方便异常时打印 C++ 堆栈
+    - 优化 TimerManager、线程池、数据驱动等基础设施
+    - MySQL/SQLite 数据引擎支持绑定 datetime
+    - 优化指标默认名称
+    - 升级 flatbuffers 版本至 23.5.6
+    - 优化 Stock 的相等比较
+    - KQuery/KRecord/KData 相等/不等比较完善并引出至 python
+    - 完善 Performance
+
+3. 其他错误修复
+    - 更新 SG 信号指示器系列方法，去除移除 OP 后的一些遗留问题
+    - 修复 TradeList 转 np 时使用了已废弃的方法
+    - 修复 SUM 存在访问越界的问题
+    - 修复 IniParser 不支持 windows 中文路径的问题
+    - 修复 RSI 存在 NaN 值时计算错误
+    - 修复 Ubuntu 23.10 下编译失败的问题
+
+
 1.2.9 - 2023年10月9日
 -------------------------
 

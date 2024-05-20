@@ -30,7 +30,7 @@
 #include <boost/archive/binary_iarchive.hpp>
 #endif /* HKU_SUPPORT_BINARY_ARCHIVE */
 
-#include <boost/serialization/unordered_map.hpp>
+#include <boost/serialization/map.hpp>
 #include <boost/serialization/export.hpp>
 #include <boost/serialization/string.hpp>
 #include <boost/serialization/shared_ptr.hpp>
@@ -56,6 +56,7 @@ class HKU_API IndParam;
  */
 class HKU_API IndicatorImp : public enable_shared_from_this<IndicatorImp> {
     PARAMETER_SUPPORT
+    friend HKU_API std::ostream& operator<<(std::ostream& os, const IndicatorImp& imp);
 
 public:
     enum OPType {
@@ -99,7 +100,7 @@ public:
 
     size_t size() const;
 
-    price_t get(size_t pos, size_t num = 0);
+    price_t get(size_t pos, size_t num = 0) const;
 
     price_t getByDate(Datetime, size_t num = 0);
 
@@ -114,6 +115,9 @@ public:
 
     /** 以Indicator的方式获取指定的输出集，该方式包含了discard的信息 */
     IndicatorImpPtr getResult(size_t result_num);
+
+    /** 判断是否和另一个指标等效，即计算效果相同 */
+    bool alike(const IndicatorImp& other) const;
 
     /**
      * 使用IndicatorImp(const Indicator&...)构造函数后，计算结果使用该函数,
@@ -158,7 +162,9 @@ public:
     void setIndParam(const string& name, const IndParam& ind);
     IndParam getIndParam(const string& name) const;
     const IndicatorImpPtr& getIndParamImp(const string& name) const;
-    const unordered_map<string, IndicatorImpPtr>& getIndParams() const;
+
+    typedef std::map<string, IndicatorImpPtr> ind_param_map_t;
+    const ind_param_map_t& getIndParams() const;
 
     price_t* data(size_t result_num = 0);
 
@@ -213,6 +219,9 @@ private:
     void execute_if();
     void execute_corr();
 
+    std::vector<IndicatorImpPtr> getAllSubNodes();
+    void repeatALikeNodes();
+
 protected:
     static size_t _get_step_start(size_t pos, size_t step, size_t discard);
 
@@ -230,7 +239,9 @@ protected:
     IndicatorImpPtr m_left;
     IndicatorImpPtr m_right;
     IndicatorImpPtr m_three;
-    unordered_map<string, IndicatorImpPtr> m_ind_params;
+    ind_param_map_t m_ind_params;  // don't use unordered_map
+
+    IndicatorImp* m_parent{nullptr};  // can't use shared_from_this in python, so not weak_ptr
 
 public:
     static void initDynEngine();
@@ -366,6 +377,9 @@ public:                                           \
         return true;                              \
     }
 
+/** 获取 OPType 名称字符串 */
+string HKU_API getOPTypeName(IndicatorImp::OPType);
+
 typedef shared_ptr<IndicatorImp> IndicatorImpPtr;
 
 HKU_API std::ostream& operator<<(std::ostream&, const IndicatorImp&);
@@ -399,7 +413,7 @@ inline KData IndicatorImp::getContext() const {
     return getParam<KData>("kdata");
 }
 
-inline const unordered_map<string, IndicatorImpPtr>& IndicatorImp::getIndParams() const {
+inline const IndicatorImp::ind_param_map_t& IndicatorImp::getIndParams() const {
     return m_ind_params;
 }
 

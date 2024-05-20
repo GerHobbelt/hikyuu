@@ -59,7 +59,7 @@ option("stacktrace")
 option_end()
 
 option("feedback")
-    set_default(false)
+    set_default(true)
     set_showmenu(true)
     set_category("hikyuu")
     set_description("Enable send feedback.")
@@ -73,7 +73,7 @@ add_rules("mode.debug", "mode.release")
 if not is_plat("windows") then add_rules("mode.coverage", "mode.asan", "mode.msan", "mode.tsan", "mode.lsan") end
 
 -- version
-set_version("1.2.9", {build = "%Y%m%d%H%M"})
+set_version("1.3.0", {build = "%Y%m%d%H%M"})
 set_configvar("LOG_ACTIVE_LEVEL", 0) -- 激活的日志级别
 -- if is_mode("debug") then
 --    set_configvar("LOG_ACTIVE_LEVEL", 0)  -- 激活的日志级别
@@ -100,12 +100,7 @@ set_configvar("HKU_ENABLE_MYSQL_KDATA", get_config("mysql") and 1 or 0)
 set_configvar("HKU_ENABLE_SQLITE_KDATA", get_config("sqlite") and 1 or 0)
 set_configvar("HKU_ENABLE_TDX_KDATA", get_config("tdx") and 1 or 0)
 
--- set warning all as error
-if is_plat("windows") then
-   set_warnings("all", "error")
-else
-    set_warnings("all")
-end
+set_warnings("all")
 
 -- set language: C99, c++ standard
 set_languages("cxx17", "c99")
@@ -113,7 +108,7 @@ set_languages("cxx17", "c99")
 local boost_version = "1.81.0"
 local hdf5_version = "1.12.2"
 local fmt_version = "10.0.0"
-local flatbuffers_version = "2.0.0"
+local flatbuffers_version = "23.5.26"
 local mysql_version = "8.0.31"
 if is_plat("windows") or (is_plat("linux", "cross") and is_arch("aarch64", "arm64.*")) then 
     mysql_version = "8.0.21" 
