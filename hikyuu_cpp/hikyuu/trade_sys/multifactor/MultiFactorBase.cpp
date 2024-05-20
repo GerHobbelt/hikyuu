@@ -6,6 +6,7 @@
  */
 
 #include <cmath>
+#include "hikyuu/utilities/thread/algorithm.h"
 #include "hikyuu/indicator/crt/ALIGN.h"
 #include "hikyuu/indicator/crt/ROCP.h"
 #include "hikyuu/indicator/crt/REF.h"
@@ -67,6 +68,14 @@ MultiFactorBase::MultiFactorBase(const string& name) {
     initParam();
 }
 
+MultiFactorBase::MultiFactorBase(const MultiFactorBase& base)
+: m_params(base.m_params),
+  m_name(base.m_name),
+  m_inds(base.m_inds),
+  m_stks(base.m_stks),
+  m_ref_stk(base.m_ref_stk),
+  m_query(base.m_query) {}
+
 MultiFactorBase::MultiFactorBase(const IndicatorList& inds, const StockList& stks,
                                  const KQuery& query, const Stock& ref_stk, const string& name,
                                  int ic_n)
@@ -115,6 +124,14 @@ void MultiFactorBase::paramChanged() {
     m_calculated = false;
 }
 
+void MultiFactorBase::reset() {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    _reset();
+
+    // 仅重置 m_calculated，其他缓存不重置，否则线程不安全
+    m_calculated = false;
+}
+
 MultiFactorPtr MultiFactorBase::clone() {
     std::lock_guard<std::mutex> lock(m_mutex);
     MultiFactorPtr p;
@@ -134,23 +151,23 @@ MultiFactorPtr MultiFactorBase::clone() {
     p->m_stks = m_stks;
     p->m_ref_stk = m_ref_stk;
     p->m_query = m_query;
-    p->m_stk_map = m_stk_map;
-    p->m_all_factors = m_all_factors;
-    p->m_date_index = m_date_index;
-    p->m_stk_factor_by_date = m_stk_factor_by_date;
     p->m_ref_dates = m_ref_dates;
-    p->m_ic = m_ic.clone();
-    p->m_calculated = m_calculated;
 
     p->m_inds.reserve(m_inds.size());
     for (const auto& ind : m_inds) {
         p->m_inds.emplace_back(ind.clone());
     }
 
-    p->m_all_factors.reserve(m_all_factors.size());
-    for (const auto& ind : m_all_factors) {
-        p->m_all_factors.emplace_back(ind.clone());
-    }
+    p->m_calculated = false;
+    // 强制重算，不克隆以下缓存，避免非线程安全
+    // p->m_stk_map = m_stk_map;
+    // p->m_date_index = m_date_index;
+    // p->m_stk_factor_by_date = m_stk_factor_by_date;
+    // p->m_ic = m_ic.clone();
+    // p->m_all_factors.reserve(m_all_factors.size());
+    // for (const auto& ind : m_all_factors) {
+    //     p->m_all_factors.emplace_back(ind.clone());
+    // }
     return p;
 }
 
@@ -166,25 +183,81 @@ const IndicatorList& MultiFactorBase::getAllFactors() {
     return m_all_factors;
 }
 
-const ScoreRecordList& MultiFactorBase::getScore(const Datetime& d) {
+ScoreRecordList MultiFactorBase::getScores(const Datetime& d) {
     calculate();
+    ScoreRecordList ret;
     const auto iter = m_date_index.find(d);
-    HKU_CHECK(iter != m_date_index.cend(), "Could not find this date: {}", d);
-    return m_stk_factor_by_date[iter->second];
+    HKU_IF_RETURN(iter == m_date_index.cend(), ret);
+    ret = m_stk_factor_by_date[iter->second];
+    return ret;
 }
 
-ScoreRecordList MultiFactorBase::getScore(const Datetime& date, size_t start, size_t end) {
+ScoreRecordList MultiFactorBase::getScores(const Datetime& date, size_t start, size_t end) {
     ScoreRecordList ret;
     HKU_IF_RETURN(start >= end, ret);
 
-    const auto& cross = getScore(date);
+    const auto& cross = getScores(date);
     if (end == Null<size_t>() || end > cross.size()) {
         end = cross.size();
     }
 
-    ret.resize(end - start);
     for (size_t i = start; i < end; i++) {
-        ret[i] = cross[i];
+        ret.emplace_back(cross[i]);
+    }
+
+    return ret;
+}
+
+ScoreRecordList MultiFactorBase::getScores(const Datetime& date, size_t start, size_t end,
+                                           std::function<bool(const ScoreRecord&)>&& filter) {
+    ScoreRecordList ret;
+    HKU_IF_RETURN(start >= end, ret);
+
+    const auto& cross = getScores(date);
+    HKU_IF_RETURN(cross.empty(), ret);
+
+    if (end == Null<size_t>() || end > cross.size()) {
+        end = cross.size();
+    }
+
+    if (filter) {
+        for (size_t i = start; i < end; i++) {
+            if (filter(cross[i])) {
+                ret.emplace_back(cross[i]);
+            }
+        }
+    } else {
+        for (size_t i = start; i < end; i++) {
+            ret.emplace_back(cross[i]);
+        }
+    }
+
+    return ret;
+}
+
+ScoreRecordList MultiFactorBase::getScores(
+  const Datetime& date, size_t start, size_t end,
+  std::function<bool(const Datetime&, const ScoreRecord&)>&& filter) {
+    ScoreRecordList ret;
+    HKU_IF_RETURN(start >= end, ret);
+
+    const auto& cross = getScores(date);
+    HKU_IF_RETURN(cross.empty(), ret);
+
+    if (end == Null<size_t>() || end > cross.size()) {
+        end = cross.size();
+    }
+
+    if (filter) {
+        for (size_t i = start; i < end; i++) {
+            if (filter(date, cross[i])) {
+                ret.emplace_back(cross[i]);
+            }
+        }
+    } else {
+        for (size_t i = start; i < end; i++) {
+            ret.emplace_back(cross[i]);
+        }
     }
 
     return ret;
@@ -265,7 +338,7 @@ Indicator MultiFactorBase::getIC(int ndays) {
     return result;
 }
 
-Indicator MultiFactorBase::getICIR(int ic_n, int ir_n) {
+Indicator MultiFactorBase::getICIR(int ir_n, int ic_n) {
     Indicator ic = getIC(ic_n);
     Indicator x = MA(ic, ir_n) / STDEV(ic, ir_n);
     x.name("ICIR");
@@ -276,13 +349,21 @@ Indicator MultiFactorBase::getICIR(int ic_n, int ir_n) {
 
 IndicatorList MultiFactorBase::_getAllReturns(int ndays) const {
     bool fill_null = getParam<bool>("fill_null");
+#if 0
     vector<Indicator> all_returns;
     all_returns.reserve(m_stks.size());
     for (const auto& stk : m_stks) {
         auto k = stk.getKData(m_query);
-        all_returns.push_back(ALIGN(REF(ROCP(k.close(), ndays), ndays), m_ref_dates, fill_null));
+        all_returns.emplace_back(ALIGN(REF(ROCP(k.close(), ndays), ndays), m_ref_dates,
+        fill_null));
     }
     return all_returns;
+#else
+    return parallel_for_index(0, m_stks.size(), [this, ndays, fill_null](size_t i) {
+        auto k = m_stks[i].getKData(m_query);
+        return ALIGN(REF(ROCP(k.close(), ndays), ndays), m_ref_dates, fill_null);
+    });
+#endif
 }
 
 vector<IndicatorList> MultiFactorBase::getAllSrcFactors() {
@@ -306,10 +387,8 @@ vector<IndicatorList> MultiFactorBase::getAllSrcFactors() {
 
     // 每日截面归一化
     if (getParam<bool>("enable_min_max_normalize")) {
-        vector<Indicator::value_t> one_day(stk_count, Null<Indicator::value_t>());
         for (size_t di = 0, days_total = m_ref_dates.size(); di < days_total; di++) {
             for (size_t ii = 0; ii < ind_count; ii++) {
-                auto* one_day_data = one_day.data();
                 Indicator::value_t min_value = std::numeric_limits<Indicator::value_t>::max();
                 Indicator::value_t max_value = std::numeric_limits<Indicator::value_t>::min();
                 for (size_t si = 0; si < stk_count; si++) {

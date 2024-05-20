@@ -90,16 +90,18 @@ public:
     PortfolioPtr clone();
 
     /** 获取所有原型系统列表，与 SE 同 */
-    const SystemList& getProtoSystemList() const;
+    const SystemList& getSystemList() const;
 
     /** 获取所有实际运行的系统列表，与 SE 同 */
     const SystemList& getRealSystemList() const;
 
 private:
-    /** 运行前准备 */
-    bool _readyForRun();
+    void initParam();
 
-    void _runMoment(const Datetime& date, bool adjust);
+    /** 运行前准备 */
+    void _readyForRun();
+
+    void _runMoment(const Datetime& date, const Datetime& nextCycle, bool adjust);
 
 protected:
     string m_name;
@@ -109,14 +111,13 @@ protected:
     AFPtr m_af;
 
     KQuery m_query;         // 关联的查询条件
-    bool m_is_ready;        // 是否已做好运行准备
     bool m_need_calculate;  // 是否需要计算标志
 
-    SystemList m_pro_sys_list;   // 所有原型系统列表，来自 SE
     SystemList m_real_sys_list;  // 所有实际运行的子系统列表
 
     // 用于中间计算的临时数据
     std::unordered_set<SYSPtr> m_running_sys_set;
+    SystemList m_dlist_sys_list;  // 因证券退市，无法执行买入的系统（资产全部损失）
     SystemWeightList m_delay_adjust_sys_list;  // 延迟调仓卖出的系统列表
     SystemWeightList m_tmp_selected_list;
     SystemWeightList m_tmp_will_remove_sys;
@@ -136,7 +137,6 @@ private:
         ar& BOOST_SERIALIZATION_NVP(m_se);
         ar& BOOST_SERIALIZATION_NVP(m_af);
         ar& BOOST_SERIALIZATION_NVP(m_query);
-        ar& BOOST_SERIALIZATION_NVP(m_is_ready);
         ar& BOOST_SERIALIZATION_NVP(m_need_calculate);
     }
 
@@ -149,7 +149,6 @@ private:
         ar& BOOST_SERIALIZATION_NVP(m_se);
         ar& BOOST_SERIALIZATION_NVP(m_af);
         ar& BOOST_SERIALIZATION_NVP(m_query);
-        ar& BOOST_SERIALIZATION_NVP(m_is_ready);
         ar& BOOST_SERIALIZATION_NVP(m_need_calculate);
     }
 
@@ -217,10 +216,6 @@ inline void Portfolio::setAF(const AFPtr& af) {
         m_af = af;
         m_need_calculate = true;
     }
-}
-
-inline const SystemList& Portfolio::getProtoSystemList() const {
-    return m_pro_sys_list;
 }
 
 inline const SystemList& Portfolio::getRealSystemList() const {

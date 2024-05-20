@@ -132,6 +132,8 @@ public:
     /** 设定交易的证券 */
     void setStock(const Stock& stk);
 
+    const KQuery& getQuery() const;
+
     /** 获取实际执行的交易记录，和 TM 的区别是不包含权息调整带来的交易记录 */
     const TradeRecordList& getTradeRecordList() const;
 
@@ -204,8 +206,8 @@ public:
     // 当前是否存在延迟的操作请求，供Portfolio
     bool haveDelayRequest() const;
 
-    // 运行前准备工作
-    bool readyForRun();
+    // 运行前准备工作, 失败将抛出异常
+    void readyForRun();
 
     TradeRecord sell(const KRecord& today, const KRecord& src_today, Part from) {
         return _sell(today, src_today, from);
@@ -525,6 +527,10 @@ inline void System::setStock(const Stock& stk) {
         m_stock = stk;
         m_calculated = false;
     }
+}
+
+inline const KQuery& System::getQuery() const {
+    return m_kdata.getQuery();
 }
 
 inline const TradeRecordList& System::getTradeRecordList() const {

@@ -13,7 +13,7 @@
 namespace hku {
 
 /**
- * 合成多因子
+ * 合成多因子，当只有一个因子时相当于简易的评分板
  * @ingroup MultiFactor
  */
 class HKU_API MultiFactorBase : public enable_shared_from_this<MultiFactorBase> {
@@ -25,9 +25,10 @@ public:
 
 public:
     MultiFactorBase();
-    MultiFactorBase(const string& name);
+    explicit MultiFactorBase(const string& name);
     MultiFactorBase(const IndicatorList& inds, const StockList& stks, const KQuery& query,
                     const Stock& ref_stk, const string& name, int ic_n);
+    MultiFactorBase(const MultiFactorBase&);
     virtual ~MultiFactorBase() = default;
 
     /** 获取名称 */
@@ -79,9 +80,22 @@ public:
     const IndicatorList& getAllFactors();
 
     /** 获取指定日期截面的所有因子值，已经降序排列 */
-    const ScoreRecordList& getScore(const Datetime&);
+    ScoreRecordList getScores(const Datetime&);
 
-    ScoreRecordList getScore(const Datetime& date, size_t start, size_t end = Null<size_t>());
+    ScoreRecordList getScores(const Datetime& date, size_t start, size_t end = Null<size_t>());
+
+    /**
+     * 获取指定日期截面 [start, end] 范围内的因子值（评分）, 并通过filer进行过滤
+     * @param date 指定日期
+     * @param start 排序起始点
+     * @param end 排序起始点(不含该点)
+     * @param filter 过滤函数
+     */
+    ScoreRecordList getScores(const Datetime& date, size_t start, size_t end,
+                              std::function<bool(const ScoreRecord&)>&& filter);
+
+    ScoreRecordList getScores(const Datetime& date, size_t start, size_t end,
+                              std::function<bool(const Datetime&, const ScoreRecord&)>&& filter);
 
     /** 获取所有截面数据，已按降序排列 */
     const vector<ScoreRecordList>& getAllScores();
@@ -109,9 +123,12 @@ public:
      */
     vector<IndicatorList> getAllSrcFactors();
 
+    void reset();
+
     typedef std::shared_ptr<MultiFactorBase> MultiFactorPtr;
     MultiFactorPtr clone();
 
+    virtual void _reset() {}
     virtual MultiFactorPtr _clone() = 0;
     virtual IndicatorList _calculate(const vector<IndicatorList>&) = 0;
 

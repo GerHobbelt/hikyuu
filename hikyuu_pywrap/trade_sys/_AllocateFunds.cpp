@@ -20,6 +20,7 @@ class PyAllocateFundsBase : public AllocateFundsBase {
 
 public:
     using AllocateFundsBase::AllocateFundsBase;
+    PyAllocateFundsBase(const AllocateFundsBase& base) : AllocateFundsBase(base) {}
 
     void _reset() override {
         PYBIND11_OVERLOAD(void, AllocateFundsBase, _reset, );
@@ -42,6 +43,7 @@ void export_AllocateFunds(py::module& m) {
     - _reset : 【可选】重载私有变量)")
       .def(py::init<>())
       .def(py::init<const string&>())
+      .def(py::init<const AllocateFundsBase&>())
       .def("__str__", to_py_str<AllocateFundsBase>)
       .def("__repr__", to_py_str<AllocateFundsBase>)
       .def_property("name", py::overload_cast<>(&AllocateFundsBase::name, py::const_),
@@ -96,4 +98,9 @@ void export_AllocateFunds(py::module& m) {
     固定比例资产分配
 
     :param float weight:  指定的资产比例 [0, 1])");
+
+    m.def("AF_MultiFactor", AF_MultiFactor, R"(AF_MultiFactor()
+      
+    创建 MultiFactor 评分权重的资产分配算法实例
+    )");
 }
