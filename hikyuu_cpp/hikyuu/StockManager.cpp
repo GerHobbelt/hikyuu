@@ -136,6 +136,12 @@ void StockManager::init(const Parameter& baseInfoParam, const Parameter& blockPa
 
     setKDataDriver(DataDriverFactory::getKDataDriverPool(m_kdataDriverParam));
 
+    // 加载 block，须在 stock 的 kdatadriver 被设置之后调用
+    m_blockDriver->load();
+
+    // 加载 K 线至缓存
+    loadAllKData();
+
     // add special Market, for temp csv file
     m_marketInfoDict["TMP"] =
       MarketInfo("TMP", "Temp Csv file", "temp load from csv file", "000001", Null<Datetime>(),
@@ -147,6 +153,15 @@ void StockManager::init(const Parameter& baseInfoParam, const Parameter& blockPa
 }
 
 void StockManager::setKDataDriver(const KDataDriverConnectPoolPtr& driver) {
+    for (auto iter = m_stockDict.begin(); iter != m_stockDict.end(); ++iter) {
+        if (iter->second.market() == "TMP")
+            continue;
+        iter->second.setKDataDriver(driver);
+    }
+}
+
+void StockManager::loadAllKData() {
+    auto driver = DataDriverFactory::getKDataDriverPool(m_kdataDriverParam);
     HKU_ERROR_IF_RETURN(!driver, void(), "kdata driver is null!");
 
     if (m_kdataDriverParam != driver->getPrototype()->getParameter()) {
@@ -191,9 +206,6 @@ void StockManager::setKDataDriver(const KDataDriverConnectPoolPtr& driver) {
 
     if (!driver->getPrototype()->canParallelLoad()) {
         for (auto iter = m_stockDict.begin(); iter != m_stockDict.end(); ++iter) {
-            if (iter->second.market() == "TMP")
-                continue;
-            iter->second.setKDataDriver(driver);
             if (preload_day)
                 iter->second.loadKDataToBuffer(KQuery::DAY);
             if (preload_week)
@@ -224,9 +236,6 @@ void StockManager::setKDataDriver(const KDataDriverConnectPoolPtr& driver) {
         // 异步并行加载
         auto& tg = *getGlobalTaskGroup();
         for (auto iter = m_stockDict.begin(); iter != m_stockDict.end(); ++iter) {
-            if (iter->second.market() == "TMP")
-                continue;
-            iter->second.setKDataDriver(driver);
             if (preload_day)
                 tg.submit([=]() mutable { iter->second.loadKDataToBuffer(KQuery::DAY); });
             if (preload_week)
@@ -254,7 +263,7 @@ void StockManager::setKDataDriver(const KDataDriverConnectPoolPtr& driver) {
         }
     }
 
-    initInnerTasek();
+    initInnerTask();
 }
 
 void StockManager::reload() {
@@ -264,6 +273,8 @@ void StockManager::reload() {
     loadAllStockTypeInfo();
     loadAllStocks();
     loadAllStockWeights();
+
+    m_blockDriver->load();
 
     HKU_INFO("start reload kdata to buffer");
     std::vector<Stock> can_not_parallel_stk_list;  // 记录不支持并行加载的Stock

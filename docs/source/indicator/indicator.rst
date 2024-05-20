@@ -612,6 +612,11 @@
     :rtype: Indicator
 
 
+.. py:function:: MDD([ind])
+
+    当前价格相对历史最高值的回撤百分比，通常用于计算最大回撤
+
+
 .. py:function:: MIN(ind1, ind2)
 
     求最小值, MIN(A,B)返回A和B中的较小值。
@@ -648,6 +653,11 @@
 
     :param data: 输入数据 KData
     :rtype: Indicator
+
+
+.. py:function:: MRR([ind])
+
+    当前价格相对历史最低值的盈利百分比
 
 
 .. py:function:: NDAY(x, y[, n=3])
@@ -825,7 +835,7 @@
 
     获取某指标中指定范围 [start, end) 的数据，生成新的指标
 
-    :param Indicator|PriceList data: 输入数据
+    :param Indicator|sequence data: 输入数据
     :param int start: 起始位置
     :param int end: 终止位置（不包含本身）
     :param int result_index: 原输入数据中的结果集
@@ -835,7 +845,7 @@
 
     计算线性回归斜率，N支持变量
 
-    :param Indicator|PriceList data: 输入数据
+    :param Indicator|sequence data: 输入数据
     :param int|Indicator|IndParam n: 时间窗口
     :rtype: Indicator
 

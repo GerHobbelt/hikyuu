@@ -73,7 +73,7 @@ add_rules("mode.debug", "mode.release")
 if not is_plat("windows") then add_rules("mode.coverage", "mode.asan", "mode.msan", "mode.tsan", "mode.lsan") end
 
 -- version
-set_version("1.3.0", {build = "%Y%m%d%H%M"})
+set_version("1.3.1", {build = "%Y%m%d%H%M"})
 set_configvar("LOG_ACTIVE_LEVEL", 0) -- 激活的日志级别
 -- if is_mode("debug") then
 --    set_configvar("LOG_ACTIVE_LEVEL", 0)  -- 激活的日志级别
@@ -154,13 +154,13 @@ add_requires("myboost " .. boost_version, {
     filesystem = true,
     serialization = true,
     system = false,
-    python = true,
-    pyver = get_config("pyver"),
+    -- python = false,
+    -- pyver = get_config("pyver"),
   },
 })
-if is_plat("windows") then
-  add_requireconfs("myboost.python", {override = true, system=false})
-end
+-- if is_plat("windows") then
+--   add_requireconfs("myboost.python", {override = true, system=false})
+-- end
 
 add_requires("spdlog", {system = false, configs = {header_only = true, fmt_external = true, vs_runtime = "MD"}})
 add_requireconfs("spdlog.fmt", {override = true, version = fmt_version, configs = {header_only = true}})

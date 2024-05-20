@@ -95,6 +95,8 @@ void StrategyBase::run() {
 
     hkuParam.set<string>("tmpdir", config.get("hikyuu", "tmpdir", "."));
     hkuParam.set<string>("datadir", config.get("hikyuu", "datadir", "."));
+    hkuParam.set<string>("quotation_server", config.get("hikyuu", "quotation_server",
+                                                        "ipc:///tmp/hikyuu_real.ipc"));
 
     if (!config.hasSection("baseinfo")) {
         HKU_FATAL("Missing configure of baseinfo!");

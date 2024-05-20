@@ -34,6 +34,7 @@ from hikyuu.gui.data.ImportPytdxToH5Task import ImportPytdxToH5
 from hikyuu.gui.data.ImportPytdxTransToH5Task import ImportPytdxTransToH5
 from hikyuu.gui.data.ImportPytdxTimeToH5Task import ImportPytdxTimeToH5
 from hikyuu.gui.data.ImportHistoryFinanceTask import ImportHistoryFinanceTask
+from hikyuu.gui.data.ImportBlockInfoTask import ImportBlockInfoTask
 from pytdx.hq import TdxHq_API
 from hikyuu.data.common_pytdx import search_best_tdx
 
@@ -94,6 +95,10 @@ class UsePytdxImportToH5Thread(QThread):
             self.tasks.append(
                 ImportHistoryFinanceTask(self.log_queue, self.queue, dest_dir))
 
+        self.tasks.append(ImportBlockInfoTask(self.log_queue, self.queue,
+                          self.config, ('行业板块', '概念板块', '地域板块', '指数板块')))
+        # self.tasks.append(ImportBlockInfoTask(self.log_queue, self.queue, self.config, ('指数板块',)))
+
         task_count = 0
         market_count = len(g_market_list)
         if self.config.getboolean('ktype', 'day', fallback=False):
@@ -116,6 +121,7 @@ class UsePytdxImportToH5Thread(QThread):
             return
 
         if task_count == 0:
+            self.send_message(['INFO', '未选择需要导入的行情数据！'])
             return
 
         use_tdx_number = min(
@@ -287,6 +293,8 @@ class UsePytdxImportToH5Thread(QThread):
                                     'IMPORT_TIME'):
                         self.send_message(
                             [taskname, 'FINISHED', market, ktype, total])
+                    elif taskname == 'IMPORT_BLOCKINFO':
+                        self.send_message([taskname, ktype])
                     else:
                         self.send_message([taskname, 'FINISHED'])
                     continue
@@ -318,6 +326,8 @@ class UsePytdxImportToH5Thread(QThread):
                         current_progress += time_progress[market]
                     current_progress = current_progress // market_count
                     self.send_message([taskname, ktype, current_progress])
+                elif taskname == 'IMPORT_BLOCKINFO':
+                    self.send_message([taskname, market, ktype])
                 else:
                     self.logger.error("Unknow task: {}".format(taskname))
             except queue.Empty:
