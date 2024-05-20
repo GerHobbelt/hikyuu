@@ -14,6 +14,7 @@
 #include "KQuery.h"
 #include "TimeLineRecord.h"
 #include "TransRecord.h"
+#include "HistoryFinanceInfo.h"
 
 namespace hku {
 
@@ -94,10 +95,10 @@ public:
     bool valid() const;
 
     /** 获取证券起始日期 */
-    Datetime startDatetime() const;
+    const Datetime& startDatetime() const;
 
     /** 获取证券最后日期 */
-    Datetime lastDatetime() const;
+    const Datetime& lastDatetime() const;
 
     /** 获取最小跳动量 */
     price_t tick() const;
@@ -119,6 +120,22 @@ public:
 
     /** 获取最大交易量 */
     double maxTradeNumber() const;
+
+    void market(const string& market_);
+    void code(const string& code_);
+    void name(const string& name_);
+    void type(uint32_t type_);
+    void valid(bool valid_);
+    void precision(int precision_);
+    void startDatetime(const Datetime&);
+    void lastDatetime(const Datetime&);
+    void tick(price_t tick_);
+    void tickValue(price_t val);
+    void minTradeNumber(double num);
+    void maxTradeNumber(double num);
+    void atom(double num) {
+        return minTradeNumber(num);
+    }
 
     /**
      * 获取指定时间段[start,end)内的权息信息
@@ -176,9 +193,8 @@ public:
 
     /**
      * 获取历史财务信息
-     * @param date 指定日期必须是0331、0630、0930、1231，如 Datetime(201109300000)
      */
-    PriceList getHistoryFinanceInfo(const Datetime& date) const;
+    const vector<HistoryFinanceInfo>& getHistoryFinance() const;
 
     /** 设置权息信息, 仅供初始化时调用 */
     void setWeightList(const StockWeightList&);
@@ -213,6 +229,13 @@ public:
     /** （临时函数）只用于更新缓存中的K线数据 **/
     void realtimeUpdate(KRecord, KQuery::KType ktype = KQuery::DAY);
 
+    /**
+     * 部分临时创建的 Stock, 直接设置KRecordList
+     * @note 谨慎调用，通常供外部数据源直接设定数据
+     */
+    void setKRecordList(const KRecordList& ks, const KQuery::KType& ktype = KQuery::DAY);
+    void setKRecordList(KRecordList&& ks, const KQuery::KType& ktype = KQuery::DAY);
+
     /** 仅用于python的__str__ */
     string toString() const;
 
@@ -244,6 +267,11 @@ struct HKU_API Stock::Data {
 
     StockWeightList m_weightList;  // 权息信息列表
     std::mutex m_weight_mutex;
+
+    mutable vector<HistoryFinanceInfo>
+      m_history_finance;  // 历史财务信息 [财务报告日期, 字段1, 字段2, ...]
+    mutable bool m_history_finance_ready{false};
+    mutable std::mutex m_history_finance_mutex;
 
     price_t m_tick;
     price_t m_tickValue;

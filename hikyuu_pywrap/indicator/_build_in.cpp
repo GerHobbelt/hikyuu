@@ -892,6 +892,14 @@ void export_Indicator_build_in(py::module& m) {
    :param KData kdata: k线数据
    :rtype: Indicator)");
 
+    m.def("ZONGGUBEN", py::overload_cast<>(ZONGGUBEN));
+    m.def("ZONGGUBEN", py::overload_cast<const KData&>(ZONGGUBEN), R"(ZONGGUBEN(kdata)
+
+   获取总股本（单位：万股）
+
+   :param KData kdata: k线数据
+   :rtype: Indicator)");
+
     m.def("HSL", HSL_1);
     m.def("HSL", HSL_2, R"(HSL(kdata)
 
@@ -1808,4 +1816,36 @@ void export_Indicator_build_in(py::module& m) {
     :param float nsigma: 剔除极值时使用的 nsigma 倍 sigma，默认 3.0
     :param bool recursive: 是否进行递归剔除极值，默认 False
     :rtype: Indicator)");
+
+    m.def("TURNOVER", py::overload_cast<int>(TURNOVER), py::arg("n") = 1);
+    m.def("TURNOVER", py::overload_cast<const KData&, int>(TURNOVER), py::arg("kdata"),
+          py::arg("n") = 1, R"(TURNOVER(data[,n=1])
+    换手率=股票成交量/流通股股数×100%
+
+    :param int n: 时间窗口)");
+
+    m.def("RESULT", py::overload_cast<int>(RESULT));
+    m.def("RESULT", py::overload_cast<const Indicator&, int>(RESULT), py::arg("data"),
+          py::arg("result_ix"), R"(RESULT(data, result_ix)
+          
+    以公式指标的方式返回指定指标中的指定结果集
+
+    :param Indicator data: 指定的指标
+    :param int result_ix: 指定的结果集)");
+
+    m.def("FINANCE", py::overload_cast<int>(FINANCE), py::arg("ix"));
+    m.def("FINANCE", py::overload_cast<const string&>(FINANCE), py::arg("name"));
+    m.def("FINANCE", py::overload_cast<const KData&, int>(FINANCE), py::arg("kdata"),
+          py::arg("ix"));
+    m.def("FINANCE", py::overload_cast<const KData&, const string&>(FINANCE), py::arg("kdata"),
+          py::arg("name"),
+          R"(FINANCE([kdata, ix, name])
+
+    获取历史财务信息。（可通过 StockManager.get_history_finance_all_fields 查询相应的历史财务字段信息）
+
+    ix, name 使用时，为二选一。即要不使用 ix，要不就使用 name 进行获取。
+
+    :param KData kdata: K线数据
+    :param int ix: 历史财务信息字段索引
+    :param int name: 历史财务信息字段名称)");
 }

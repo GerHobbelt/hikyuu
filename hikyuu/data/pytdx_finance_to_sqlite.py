@@ -22,15 +22,15 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from hikyuu.data.common import MARKETID, STOCKTYPE
+from hikyuu.data.common import MARKETID, STOCKTYPE, historyfinancialreader, get_a_stktype_list
 from hikyuu.data.common_sqlite3 import get_marketid, create_database
 
 
 def pytdx_import_finance_to_sqlite(db_connect, pytdx_connect, market):
     """导入公司财务信息"""
     marketid = get_marketid(db_connect, market)
-    sql = "select stockid, marketid, code, valid, type from stock where marketid={} and type = {} and valid=1"\
-        .format(marketid, STOCKTYPE.A)
+    sql = "select stockid, marketid, code, valid, type from stock where marketid={} and type in {} and valid=1"\
+        .format(marketid, get_a_stktype_list())
 
     cur = db_connect.cursor()
     all_list = cur.execute(sql).fetchall()
@@ -39,7 +39,7 @@ def pytdx_import_finance_to_sqlite(db_connect, pytdx_connect, market):
     records = []
     for stk in all_list:
         x = pytdx_connect.get_finance_info(1 if stk[1] == MARKETID.SH else 0, stk[2])
-        #print(stk[2])
+        # print(stk[2])
         if x is not None and x['code'] == stk[2]:
             cur.execute(
                 "select updated_date from stkfinance where stockid={} and updated_date={}".format(
@@ -49,9 +49,9 @@ def pytdx_import_finance_to_sqlite(db_connect, pytdx_connect, market):
             a = cur.fetchall()
             a = [x[0] for x in a]
             if a:
-                #print(a)
+                # print(a)
                 continue
-            #else:
+            # else:
             #    print(market, stk[2])
             records.append(
                 (
@@ -115,6 +115,17 @@ def pytdx_import_finance_to_sqlite(db_connect, pytdx_connect, market):
     return len(records)
 
 
+def history_finance_import_sqlite(connect, filename):
+    file_date = filename[-12:-4]
+    ret = historyfinancialreader(filename)
+    cur = connect.cursor()
+    cur.execute(f"delete from `HistoryFinance` where file_date={file_date}")
+    cur.executemany(
+        "insert into `HistoryFinance` (`file_date`, `market_code`, `report_date`, `values`) values (?,?,?,?)", ret)
+    connect.commit()
+    cur.close()
+
+
 if __name__ == '__main__':
     import os
     import time
@@ -123,7 +134,7 @@ if __name__ == '__main__':
     starttime = time.time()
 
     dest_dir = "d:\\stock"
-    tdx_server = '120.76.152.87'  #'119.147.212.81'
+    tdx_server = '120.76.152.87'  # '119.147.212.81'
     tdx_port = 7709
 
     connect = sqlite3.connect(dest_dir + "\\stock.db")

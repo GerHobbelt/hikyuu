@@ -147,7 +147,7 @@ class StockFuncFormatter(object):
 
 def getDayLocatorAndFormatter(dates):
     """获取显示日线时使用的Major Locator和Major Formatter"""
-    sep = len(dates) / 8
+    sep = len(dates) / 10
     loc = [
         (i, str(d) if (i != (len(dates) - 1)) and (i % sep != 0) else "{}-{}-{}".format(d.year, d.month, d.day))
         for i, d in enumerate(dates)
@@ -394,6 +394,10 @@ def iplot(
     axes.set_xlim(-1, len(indicator) + 1)
     if kref:
         ax_set_locator_formatter(axes, kref.get_datetime_list(), kref.get_query().ktype)
+    else:
+        k = indicator.get_context()
+        if len(k) > 0:
+            ax_set_locator_formatter(axes, k.get_datetime_list(), k.get_query().ktype)
     # draw()
 
 
@@ -474,6 +478,10 @@ def ibar(
     axes.set_xlim(-1, len(indicator) + 1)
     if kref:
         ax_set_locator_formatter(axes, kref.get_datetime_list(), kref.get_query().ktype)
+    else:
+        k = indicator.get_context()
+        if len(k) > 0:
+            ax_set_locator_formatter(axes, k.get_datetime_list(), k.get_query().ktype)
     # draw()
 
 
@@ -777,7 +785,7 @@ def sys_performance(sys, ref_stk=None):
     cur_fund = per['当前总资产']
     t1 = '投入总资产: {:<.2f}    当前总资产: {:<.2f}    当前盈利: {:<.2f}'.format(
         invest_total, cur_fund, cur_fund - invest_total)
-    t2 = '当前策略收益: {:<.2f}%    年化收益率: {:<.2}%    最大回撤: {:<.2f}%'.format(
+    t2 = '当前策略收益: {:<.2f}%    年化收益率: {:<.2f}%    最大回撤: {:<.2f}%'.format(
         funds_return[-1], per["帐户平均年收益率%"], max_pullback)
     t3 = '系统胜率: {:<.2f}%    盈/亏比: 1 : {:<.2f}    夏普比率: {:<.2f}'.format(
         per['赢利交易比例%'], per['净赢利/亏损比例'], sharp)

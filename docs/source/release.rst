@@ -1,6 +1,37 @@
 版本发布说明
 =======================
 
+2.0.2 - 2024年4月19日
+-------------------------
+
+1. 新增特性
+    - 历史财务信息入库，并增加指标 FINANCE 获取相应历史财务数据
+    - 新增 RESULT 指标，以便对存在多个结果集的指标可以通过指标公式的方式获取结果
+    - Stock 开放部分属性可在运行时修改，增加 set_krecord_list 方法，可以希望使用其他数据源时生成临时的 Stock 并获取 K 线数据
+
+2. 缺陷修复
+    - fixed 获取节假日信息时出现错误
+    - fixed hdf5 在只有日线数据时，运行在 jupyter 中，初始化会出现卡死
+    - fixed 新增的北交所股票类型未修改全，导入数据后又变成了 A 股类型
+
+
+2.0.1 - 2024年4月7日
+-------------------------
+
+1. 新增 TURNOVER （换手率指标）
+2. 新增股票类型 STOCKTYPE_A_BJ (北交所), 修复科创板和北交所股票最小交易量为1
+3. fixed tm 建立日期小于参考日期时 sys_performance 报错
+4. hub 中的 prtflo 未 pf, 和内部叫法统一
+5. 调整 MF_MultiFactor getScores 方法命名(原为 getScore )，并调整为在指定日期不存在数据时返回空列表（原为抛出异常）
+6. fixed python 中 TradeRecordList/PositionRecordList 中 to_df 方法失效
+7. hku_catch 中忽略对 KeyboardInterrupt 的捕获，避免 python 中 Ctrl-C 无法终止
+8. crtSL 更名为 crtSP (移滑价差算法)，和内部其他叫法统一
+9. fixed 缺失 hku_save / hku_load 函数，导致示例运行失败
+10. fixed crtMM 补充缺失的接口
+11. 更新其他运行失败示例，如 OrderBroker (pybind需要先创建对象再传入方法)
+12. python 中缺失 CAPITAL (流通盘), 原可使用 LIUTONGPAN, 但缺失对 CAPITAL 的同名指定
+
+
 2.0.0 - 2024年4月3日
 -------------------------
 
