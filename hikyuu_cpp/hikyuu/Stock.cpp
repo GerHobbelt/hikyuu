@@ -831,6 +831,10 @@ Parameter Stock::getFinanceInfo() const {
     return result;
 }
 
+vector<Block> Stock::getBelongToBlockList(const string& category) const {
+    return StockManager::instance().getStockBelongs(*this, category);
+}
+
 // 判断是否在交易时间段内（不判断日期）
 bool Stock::isTransactionTime(Datetime time) {
     MarketInfo market_info = StockManager::instance().getMarketInfo(market());
@@ -932,8 +936,8 @@ void Stock::setKRecordList(KRecordList&& ks, const KQuery::KType& ktype) {
     m_kdataDriver = DataDriverFactory::getKDataDriverPool(param);
 
     m_data->m_valid = true;
-    m_data->m_startDate = ks.front().datetime;
-    m_data->m_lastDate = ks.back().datetime;
+    m_data->m_startDate = (*m_data->pKData[nktype]).front().datetime;
+    m_data->m_lastDate = (*m_data->pKData[nktype]).back().datetime;
 }
 
 const vector<HistoryFinanceInfo>& Stock::getHistoryFinance() const {

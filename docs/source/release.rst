@@ -1,6 +1,67 @@
 版本发布说明
 =======================
 
+2.0.7 - 2024年5月18日
+-------------------------
+
+1. sys.performance 绘图时标题中加上对应的证券名称及标识，以及修正统计范围为回测截止时间
+2. 优化内建信号指示器 SG_Band, 支持使用 3 个指标分别作为参考、下轨、上轨
+3. fixed MultiFactorBase 默认构造时缺失名称
+4. fixed SignalBase reset 中缺失对象成员
+5. fixed System 中止盈实现，保证止盈仅在盈利情况下发生
+6. fixed hub 获取 part 下子部件失败
+
+
+2.0.6 - 2024年5月13日
+-------------------------
+
+1. 安装包HikyuuTDX不采用gui模式，win11下GUI模式会造成直接timeout
+2. 策略部件 python 导出时，支持 python 的动态属性，在 hub 中支持
+3. fixed _Selector 缺失赋值构造函数，导致 clone 失败
+
+
+2.0.5 - 2024年5月8日
+-------------------------
+
+主要修复
+1. fixed 接收spot时，分钟级别的成交量为股数
+2. fixed SG_Cycle 其 alternate 属性须为 false，影响 PF 示例
+
+其他修复
+1. fixed strategy 加载权息失败
+2. StrategyContext 在设定 ktypes 时进行从小到大的排序，以便后续能够按顺序调用 onBar
+3. fixed setKRecordList 使用 move(ks) 时错误
+
+
+2.0.4 - 2024年5月6日
+-------------------------
+
+1. 缺陷修复
+    - fixed ETF 权息缺少扩缩股
+    - fixed Portfolio 在非延迟买入、延迟卖出的场景下对账错误
+    - fixed matplotlib performance 绘制时，当前收益率显示显示错误
+    - fixed requirements.txt 增加tdqm, 缺失可能导致 windows HikyuuTdx 无法直接命令启动
+
+2. 其他改进
+    - Stock 添加获取所属板块列表方法 get_belong_to_block_list
+    - 改进 sys_performance，在query日期不在stock的有效日期范围内时，抛出异常
+    - matplotlib sysplot 增加 only_draw_close，避免数据量较大时, matploblib 绘制 K 线过慢
+    - 改进matplot绘制图形时，x轴坐标显示
+    - pf 系统名称加上股票名称
+    - 处理nng升级后的编译告警
+
+
+2.0.3 - 2024年4月25日
+-------------------------
+
+1. 增强 FINANCE，增加 only_year_report 和 dynamic 参数，以便进行市盈率等计算
+2. Indicaotr.plot 绘制时，将 x 轴设置为日期
+3. 增加北交所 92 号段
+4. 增加 BlockIndex 表，支持 Block 获取对应指数
+5. fixed 板块信息导入时，如果网络不好，未获取到当前板块信息时，会把之前的板块信息删除
+6. fixed interactive 中 blockbj 为空
+
+
 2.0.2 - 2024年4月19日
 -------------------------
 

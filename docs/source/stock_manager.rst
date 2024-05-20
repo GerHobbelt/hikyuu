@@ -416,8 +416,12 @@ StockManager/Block/Stock
         
         :param Query.KType ktype: K线类型
 
-
+    .. py:method:: get_belong_to_block_list(self[, category=None])
     
+        获取所属板块列表
+
+        :param str category: 指定的板块分类，为 None 时，返回所有板块分类下的所属板块
+        :rtype: list    
     
     
 .. py:class:: Block
@@ -426,6 +430,7 @@ StockManager/Block/Stock
     
     .. py:attribute:: category : 板块分类
     .. py:attribute:: name : 板块名称
+    .. py:attribute:: index_stock: 对应指数（可能为空 Stock）
     
     .. py:method:: __init__(self, category, name):
     

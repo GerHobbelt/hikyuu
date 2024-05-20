@@ -452,6 +452,7 @@ TradeRecord System::_runMoment(const KRecord& today, const KRecord& src_today) {
 
     // 如果当前环境无效
     if (!current_ev_valid) {
+        HKU_INFO_IF(trace, "[{}] current EV is invalid", name());
         TradeRecord tr;
         // 如果持有多头仓位，则立即清仓卖出
         if (m_tm->have(m_stock)) {
@@ -465,6 +466,8 @@ TradeRecord System::_runMoment(const KRecord& today, const KRecord& src_today) {
 
     // 环境是从无效变为有效时
     if (!m_pre_ev_valid) {
+        HKU_INFO_IF(trace, "[{}] EV status from invalid to valid", name());
+
         // 如果使用环境判定策略进行初始建仓
         if (getParam<bool>("ev_open_position")) {
             HKU_INFO_IF(trace, "[{}] EV to buy", name());
@@ -484,6 +487,7 @@ TradeRecord System::_runMoment(const KRecord& today, const KRecord& src_today) {
 
     // 如果系统当前无效
     if (!current_cn_valid) {
+        HKU_INFO_IF(trace, "[{}] current CN is invalid", name());
         TradeRecord tr;
         // 如果持有多头仓位，则立即清仓卖出
         if (m_tm->have(m_stock)) {
@@ -497,6 +501,8 @@ TradeRecord System::_runMoment(const KRecord& today, const KRecord& src_today) {
 
     // 如果系统从无效变为有效
     if (!m_pre_cn_valid) {
+        HKU_INFO_IF(trace, "[{}] CN status from invalid to valid", name());
+
         // 如果使用环境判定策略进行初始建仓
         if (getParam<bool>("cn_open_position")) {
             HKU_INFO_IF(trace, "[{}] CN to buy", name());
@@ -550,6 +556,7 @@ TradeRecord System::_runMoment(const KRecord& today, const KRecord& src_today) {
     price_t src_current_price = src_today.closePrice;  // 未复权的原始价格
 
     PositionRecord position = m_tm->getPosition(today.datetime, m_stock);
+    HKU_INFO_IF(trace, "[{}] current postion: {}", name(), position.number);
     if (position.number != 0) {
         TradeRecord tr;
         if (src_current_price <= position.stoploss) {
@@ -563,7 +570,8 @@ TradeRecord System::_runMoment(const KRecord& today, const KRecord& src_today) {
             tr = _sell(today, src_today, PART_PROFITGOAL);
 
         } else {
-            price_t current_take_profile = _getTakeProfitPrice(today.datetime);
+            price_t current_take_profile =
+              _getTakeProfitPrice(today.datetime, src_today.closePrice);
             if (current_take_profile != 0.0) {
                 if (current_take_profile < m_lastTakeProfit) {
                     current_take_profile = m_lastTakeProfit;
@@ -575,7 +583,9 @@ TradeRecord System::_runMoment(const KRecord& today, const KRecord& src_today) {
                 size_t pos = m_kdata.getPos(today.datetime);
                 size_t position_pos = m_kdata.getPos(position.takeDatetime);
                 // 如果当前价格小于等于止盈价，且满足止盈延迟条件则卖出
-                if (pos - position_pos >= tp_delay_n && current_price <= current_take_profile) {
+                price_t profit = position.number * src_today.closePrice - position.totalCost;
+                if (pos - position_pos >= tp_delay_n && current_price <= current_take_profile &&
+                    profit > (position.buyMoney - position.sellMoney)) {
                     HKU_INFO_IF(
                       trace,
                       "[{}] TP to sell, current price after restoration: {}, take_profit: {}",
@@ -631,7 +641,7 @@ TradeRecord System::_buyNow(const KRecord& today, const KRecord& src_today, Part
         return result;
     }
 
-    m_lastTakeProfit = _getTakeProfitPrice(record.datetime);
+    m_lastTakeProfit = record.realPrice;
     m_trade_list.push_back(record);
     _buyNotifyAll(record);
     return record;
@@ -684,7 +694,7 @@ TradeRecord System::_buyDelay(const KRecord& today, const KRecord& src_today) {
     }
 
     m_buy_days = 0;
-    m_lastTakeProfit = 0;
+    m_lastTakeProfit = record.realPrice;
     m_trade_list.push_back(record);
     _buyNotifyAll(record);
     m_buyRequest.clear();
@@ -716,6 +726,9 @@ void System::_submitBuyRequest(const KRecord& today, const KRecord& src_today, P
 }
 
 TradeRecord System::_sellForce(const Datetime& date, double num, Part from, bool on_open) {
+    bool trace = getParam<bool>("trace");
+    HKU_INFO_IF(trace, "[{}] force sell {} by {}", name(), num, getSystemPartName(from));
+
     TradeRecord record;
     size_t pos = m_kdata.getPos(date);
     HKU_TRACE_IF_RETURN(pos == Null<size_t>(), record,
@@ -742,6 +755,12 @@ TradeRecord System::_sellForce(const Datetime& date, double num, Part from, bool
     record =
       m_tm->sell(date, m_stock, realPrice, real_sell_num, position.stoploss, position.goalPrice,
                  on_open ? src_krecord.openPrice : src_krecord.closePrice, from);
+
+    // 如果已未持仓，最后的止赢价初始为0
+    if (!m_tm->have(m_stock)) {
+        m_lastTakeProfit = 0.0;
+    }
+
     m_trade_list.push_back(record);
     _sellNotifyAll(record);
     return record;
@@ -789,7 +808,7 @@ TradeRecord System::_sellNow(const KRecord& today, const KRecord& src_today, Par
     if (!m_tm->have(m_stock)) {
         m_lastTakeProfit = 0.0;
     } else {
-        m_lastTakeProfit = _getTakeProfitPrice(today.datetime);
+        m_lastTakeProfit = src_today.closePrice;
     }
 
     m_trade_list.push_back(record);
@@ -844,6 +863,8 @@ TradeRecord System::_sellDelay(const KRecord& today, const KRecord& src_today) {
     // 如果已未持仓，最后的止赢价初始为0
     if (!m_tm->have(m_stock)) {
         m_lastTakeProfit = 0.0;
+    } else {
+        m_lastTakeProfit = src_today.openPrice;
     }
 
     m_trade_list.push_back(record);
