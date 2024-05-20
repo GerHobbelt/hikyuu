@@ -42,19 +42,16 @@ std::string getVersion() {
 }
 
 std::string getVersionWithBuild() {
-    return fmt::format("{}_{}_{}_{}_{}",
-            HKU_VERSION,
-            HKU_VERSION_BUILD,
-            HKU_VERSION_MODE,
-            getPlatform(),
-            getCpuArch());
+    return fmt::format("{}_{}_{}_{}_{}", HKU_VERSION, HKU_VERSION_BUILD, HKU_VERSION_MODE,
+                       getPlatform(), getCpuArch());
 }
 
 std::string getVersionWithGit() {
     return HKU_VERSION_GIT;
 }
 
-static bool readUUID(const boost::uuids::uuid& out) {
+// cppcheck-suppress constParameterReference
+static bool readUUID(boost::uuids::uuid& out) {
     std::string filename = fmt::format("{}/.hikyuu/uid", getUserDir());
     FILE* fp = fopen(filename.c_str(), "rb");
     HKU_IF_RETURN(!fp, false);

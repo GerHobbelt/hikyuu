@@ -42,8 +42,10 @@ StoplossPtr IndicatorStoploss::_clone() {
 void IndicatorStoploss::_calculate() {
     Indicator ind = m_op(KDATA_PART(m_kdata, getParam<string>("kpart")));
     size_t total = ind.size();
+    auto const* ind_data = ind.data();
+    auto const* ks = m_kdata.data();
     for (size_t i = ind.discard(); i < total; ++i) {
-        m_result[m_kdata[i].datetime] = ind[i];
+        m_result[ks[i].datetime] = ind_data[i];
     }
 }
 
