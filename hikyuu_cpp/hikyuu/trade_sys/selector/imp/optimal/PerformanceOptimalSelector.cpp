@@ -183,7 +183,7 @@ void PerformanceOptimalSelector::_calculate_parallel(
           Performance per;
           SYSPtr selected_sys;
           if (m_pro_sys_list.size() == 1) {
-              selected_sys = m_pro_sys_list.back();
+              selected_sys = m_pro_sys_list.back()->clone();
           } else if (0 == mode) {
               double max_value = std::numeric_limits<double>::lowest();
               for (const auto& sys : m_pro_sys_list) {
@@ -246,8 +246,11 @@ void PerformanceOptimalSelector::_calculate_parallel(
     }
 }
 
-SEPtr HKU_API SE_PerformanceOptimal() {
-    return make_shared<PerformanceOptimalSelector>();
+SEPtr HKU_API SE_PerformanceOptimal(const string& key, int mode) {
+    PerformanceOptimalSelector* p = new PerformanceOptimalSelector();
+    p->setParam<string>("key", key);
+    p->setParam<int>("mode", mode);
+    return SEPtr(p);
 }
 
 }  // namespace hku
