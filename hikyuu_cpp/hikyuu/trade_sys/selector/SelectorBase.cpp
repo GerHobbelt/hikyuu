@@ -70,19 +70,7 @@ void SelectorBase::reset() {
 }
 
 SelectorPtr SelectorBase::clone() {
-    SelectorPtr p;
-    try {
-        p = _clone();
-    } catch (...) {
-        HKU_ERROR("Subclass _clone failed!");
-        p = SelectorPtr();
-    }
-
-    if (!p || p.get() == this) {
-        HKU_ERROR("Failed clone! Will use self-ptr!");
-        return shared_from_this();
-    }
-
+    SelectorPtr p = _clone();
     p->m_params = m_params;
     p->m_name = m_name;
     p->m_query = m_query;
@@ -96,7 +84,7 @@ SelectorPtr SelectorBase::clone() {
     }
 
     p->m_pro_sys_list.reserve(m_pro_sys_list.size());
-    for (const auto& sys : m_real_sys_list) {
+    for (const auto& sys : m_pro_sys_list) {
         p->m_pro_sys_list.emplace_back(sys->clone());
     }
     return p;
