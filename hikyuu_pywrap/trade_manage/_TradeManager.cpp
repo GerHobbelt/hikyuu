@@ -216,12 +216,21 @@ public:
         PYBIND11_OVERRIDE_NAME(bool, TradeManagerBase, "add_trade_record", addTradeRecord, tr);
     }
 
+    bool addPosition(const PositionRecord& pr) override {
+        PYBIND11_OVERRIDE_NAME(bool, TradeManagerBase, "add_position", addPosition, pr);
+    }
+
     string str() const override {
         PYBIND11_OVERRIDE_NAME(string, TradeManagerBase, "__str__", str, );
     }
 
     void tocsv(const string& path) override {
         PYBIND11_OVERLOAD(void, TradeManagerBase, tocsv, path);
+    }
+
+    void fetchAssetInfoFromBroker(const OrderBrokerPtr& broker) override {
+        PYBIND11_OVERRIDE_NAME(void, TradeManagerBase, "fetch_asset_info_from_broker",
+                               fetchAssetInfoFromBroker, broker);
     }
 };
 
@@ -536,6 +545,13 @@ void export_TradeManager(py::module& m) {
     :return: True（成功） | False（失败）
     :rtype: bool)")
 
+      .def("add_position", &TradeManagerBase::addPosition, R"(add_postion(self, position)
+
+    建立初始账户后，直接加入持仓记录，仅用于构建初始有持仓的账户
+
+    :param PositionRecord position: 持仓记录
+    return True | False)")
+
       .def("tocsv", &TradeManagerBase::tocsv, R"(tocsv(self, path)
 
     以csv格式输出交易记录、未平仓记录、已平仓记录、资产净值曲线
@@ -548,6 +564,8 @@ void export_TradeManager(py::module& m) {
       根据权息信息更新当前持仓及交易记录，必须按时间顺序被调用
 
       :param Datetime date: 当前时刻)")
+
+      .def("fetch_asset_info_from_broker", &TradeManagerBase::fetchAssetInfoFromBroker)
 
         DEF_PICKLE(TradeManagerPtr);
 }

@@ -6,6 +6,7 @@
  */
 
 #include <hikyuu/strategy/Strategy.h>
+#include <hikyuu/strategy/BrokerTradeManager.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
@@ -23,12 +24,8 @@ void export_Strategy(py::module& m) {
                     py::overload_cast<const string&>(&Strategy::name),
                     py::return_value_policy::copy, "策略名称")
 
-      .def_property("stock_list", py::overload_cast<>(&Strategy::getStockCodeList, py::const_),
-                    py::overload_cast<const vector<string>&>(&Strategy::setStockCodeList),
-                    py::return_value_policy::copy, "股票代码列表")
-      .def_property("ktype_list", py::overload_cast<>(&Strategy::getKTypeList, py::const_),
-                    py::overload_cast<const vector<KQuery::KType>&>(&Strategy::setKTypeList),
-                    py::return_value_policy::copy, "需要的K线类型")
+      .def_property_readonly("context", &Strategy::context, py::return_value_policy::copy,
+                             "策略上下文")
 
       .def("start", &Strategy::start)
       .def("on_change",
@@ -61,21 +58,25 @@ void export_Strategy(py::module& m) {
                };
                self.onReceivedSpot(new_func);
            })
-      .def("run_daily",
-           [](Strategy& self, py::object func, const TimeDelta& time) {
-               HKU_CHECK(py::hasattr(func, "__call__"), "func is not callable!");
-               py::object c_func = func.attr("__call__");
-               auto new_func = [=]() {
-                   try {
-                       c_func();
-                   } catch (const std::exception& e) {
-                       HKU_ERROR(e.what());
-                   } catch (...) {
-                       HKU_ERROR("Unknown error!");
-                   }
-               };
-               self.runDaily(new_func, time);
-           })
+      .def(
+        "run_daily",
+        [](Strategy& self, py::object func, const TimeDelta& time, std::string market,
+           bool ignore_market) {
+            HKU_CHECK(py::hasattr(func, "__call__"), "func is not callable!");
+            py::object c_func = func.attr("__call__");
+            auto new_func = [=]() {
+                try {
+                    c_func();
+                } catch (const std::exception& e) {
+                    HKU_ERROR(e.what());
+                } catch (...) {
+                    HKU_ERROR("Unknown error!");
+                }
+            };
+            self.runDaily(new_func, time, market, ignore_market);
+        },
+        py::arg("func"), py::arg("time"), py::arg("market") = "SH",
+        py::arg("ignore_market") = false)
       .def(
         "run_daily_at",
         [](Strategy& self, py::object func, const TimeDelta& time, bool ignore_holiday) {
@@ -93,4 +94,18 @@ void export_Strategy(py::module& m) {
             self.runDailyAt(new_func, time, ignore_holiday);
         },
         py::arg("func"), py::arg("time"), py::arg("ignore_holiday") = true);
+
+    m.def("crtBrokerTM", crtBrokerTM, py::arg("broker"), py::arg("cost_func") = TC_Zero(),
+          py::arg("name") = "SYS");
+
+    m.def("run_in_strategy",
+          py::overload_cast<const SYSPtr&, const Stock&, const KQuery&, const OrderBrokerPtr&,
+                            const TradeCostPtr&>(runInStrategy),
+          py::arg("sys"), py::arg("stock"), py::arg("query"), py::arg("broker"),
+          py::arg("cost_func"));
+    m.def("run_in_strategy",
+          py::overload_cast<const PFPtr&, const KQuery&, int, const OrderBrokerPtr&,
+                            const TradeCostPtr&>(runInStrategy),
+          py::arg("pf"), py::arg("query"), py::arg("adjust_cycle"), py::arg("broker"),
+          py::arg("cost_func"));
 }
