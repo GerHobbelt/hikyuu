@@ -10,8 +10,9 @@
 
 #include <mutex>
 #include <thread>
-#include "utilities/Parameter.h"
-#include "data_driver/DataDriverFactory.h"
+#include "hikyuu/utilities/Parameter.h"
+#include "hikyuu/utilities/thread/thread.h"
+#include "hikyuu/data_driver/DataDriverFactory.h"
 #include "Block.h"
 #include "MarketInfo.h"
 #include "StockTypeInfo.h"
@@ -20,9 +21,6 @@
 namespace hku {
 
 typedef vector<string> MarketList;
-
-Parameter default_preload_param();
-Parameter default_other_param();
 
 /**
  * 证券信息统一管理类
@@ -47,8 +45,8 @@ public:
      * @param context 策略上下文
      */
     void init(const Parameter& baseInfoParam, const Parameter& blockParam,
-              const Parameter& kdataParam, const Parameter& preloadParam = default_preload_param(),
-              const Parameter& hikyuuParam = default_other_param(),
+              const Parameter& kdataParam, const Parameter& preloadParam,
+              const Parameter& hikyuuParam,
               const StrategyContext& context = StrategyContext({"all"}));
 
     /** 重新加载 */
@@ -89,6 +87,9 @@ public:
 
     /** 获取证券数量 */
     size_t size() const;
+
+    /** 是否所有数据准备完毕 */
+    bool dataReady() const;
 
     /**
      * 根据"市场简称证券代码"获取对应的证券实例
@@ -218,6 +219,11 @@ public:
         return m_thread_id;
     }
 
+    /** 仅由程序退出使使用！！！ */
+    ThreadPool* getLoadTaskGroup() {
+        return m_load_tg.get();
+    }
+
 public:
     typedef StockMapIterator const_iterator;
     const_iterator begin() const {
@@ -228,8 +234,8 @@ public:
     }
 
 private:
-    /* 设置K线驱动 */
-    void setKDataDriver(const KDataDriverConnectPoolPtr&);
+    /* 加载全部数据 */
+    void loadData();
 
     /* 加载 K线数据至缓存 */
     void loadAllKData();
@@ -255,15 +261,13 @@ private:
     /** 加载历史财经字段索引 */
     void loadHistoryFinanceField();
 
-    /** 加载历史财务数据 */
-    void loadHistoryFinance();
-
 private:
     StockManager();
 
 private:
     static StockManager* m_sm;
     std::atomic_bool m_initializing;
+    std::atomic_bool m_data_ready;  // 用于指示是否所有数据准备完毕
     std::thread::id m_thread_id;  // 记录线程id，用于判断Stratege是以独立进程方式还是线程方式运行
     string m_tmpdir;
     string m_datadir;
@@ -271,18 +275,18 @@ private:
     BlockInfoDriverPtr m_blockDriver;
 
     StockMapIterator::stock_map_t m_stockDict;  // SH000001 -> stock
-    std::mutex* m_stockDict_mutex;
+    std::shared_mutex* m_stockDict_mutex;
 
     typedef unordered_map<string, MarketInfo> MarketInfoMap;
     mutable MarketInfoMap m_marketInfoDict;
-    std::mutex* m_marketInfoDict_mutex;
+    std::shared_mutex* m_marketInfoDict_mutex;
 
     typedef unordered_map<uint32_t, StockTypeInfo> StockTypeInfoMap;
     mutable StockTypeInfoMap m_stockTypeInfo;
-    std::mutex* m_stockTypeInfo_mutex;
+    std::shared_mutex* m_stockTypeInfo_mutex;
 
     std::unordered_set<Datetime> m_holidays;  // 节假日
-    std::mutex* m_holidays_mutex;
+    std::shared_mutex* m_holidays_mutex;
 
     ZhBond10List m_zh_bond10;  // 10年期中国国债收益率数据
 
@@ -295,18 +299,20 @@ private:
     Parameter m_preloadParam;
     Parameter m_hikyuuParam;
     StrategyContext m_context;
+
+    std::unique_ptr<ThreadPool> m_load_tg;  // 异步数据加载辅助线程组
 };
 
 inline size_t StockManager::size() const {
     return m_stockDict.size();
 }
 
-inline Stock StockManager::operator[](const string& query) const {
-    return getStock(query);
+inline bool StockManager::dataReady() const {
+    return m_data_ready;
 }
 
-inline bool StockManager::isHoliday(const Datetime& d) const {
-    return m_holidays.count(d);
+inline Stock StockManager::operator[](const string& query) const {
+    return getStock(query);
 }
 
 inline const Parameter& StockManager::getBaseInfoDriverParameter() const {
