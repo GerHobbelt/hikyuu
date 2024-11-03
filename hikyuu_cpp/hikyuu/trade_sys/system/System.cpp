@@ -126,6 +126,18 @@ void System::initParam() {
     setParam<bool>("shared_sp", false);
 }
 
+void System::setNotSharedAll() {
+    setParam<bool>("shared_tm", false);
+    setParam<bool>("shared_ev", false);
+    setParam<bool>("shared_cn", false);
+    setParam<bool>("shared_sg", false);
+    setParam<bool>("shared_mm", false);
+    setParam<bool>("shared_st", false);
+    setParam<bool>("shared_tp", false);
+    setParam<bool>("shared_pg", false);
+    setParam<bool>("shared_sp", false);
+}
+
 void System::baseCheckParam(const string& name) const {
     if ("max_delay_count" == name) {
         HKU_ASSERT(getParam<int>("max_delay_count") >= 0);
@@ -181,6 +193,8 @@ void System::reset() {
     m_sellRequest.clear();
     m_sellShortRequest.clear();
     m_buyShortRequest.clear();
+
+    _reset();
 }
 
 void System::forceResetAll() {
@@ -222,6 +236,8 @@ void System::forceResetAll() {
     m_sellRequest.clear();
     m_sellShortRequest.clear();
     m_buyShortRequest.clear();
+
+    _forceResetAll();
 }
 
 void System::setTO(const KData& kdata) {
@@ -267,7 +283,7 @@ void System::setTO(const KData& kdata) {
 }
 
 SystemPtr System::clone() {
-    SystemPtr p = make_shared<System>();
+    SystemPtr p = _clone();
     if (m_tm)
         p->m_tm = getParam<bool>("shared_tm") ? m_tm : m_tm->clone();
     if (m_ev)

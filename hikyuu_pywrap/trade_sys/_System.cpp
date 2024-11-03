@@ -15,12 +15,6 @@ using namespace hku;
 #pragma warning(disable : 4267)
 #endif
 
-void (System::*run_1)(const KQuery&, bool, bool) = &System::run;
-void (System::*run_2)(const KData&, bool, bool) = &System::run;
-void (System::*run_3)(const Stock&, const KQuery&, bool, bool) = &System::run;
-
-TradeRecord (System::*runMoment_1)(const Datetime&) = &System::runMoment;
-
 void export_System(py::module& m) {
     m.def("get_system_part_name", getSystemPartName, R"(get_system_part_name(part)
 
@@ -85,6 +79,7 @@ void export_System(py::module& m) {
   - cn_open_position=False (bool): 是否使用系统有效性条件进行初始建仓)")
 
       .def(py::init<const string&>())
+      .def(py::init<const System&>())
       .def(py::init<const TradeManagerPtr&, const MoneyManagerPtr&, const EnvironmentPtr&,
                     const ConditionPtr&, const SignalPtr&, const StoplossPtr&, const StoplossPtr&,
                     const ProfitGoalPtr&, const SlippagePtr&, const string&>())
@@ -123,6 +118,8 @@ void export_System(py::module& m) {
     :raises logic_error: Unsupported type! 不支持的参数类型)")
 
       .def("have_param", &System::haveParam, "是否存在指定参数")
+
+      .def("set_not_shared_all", &System::setNotSharedAll, "将所有组件设置为非共享")
 
       .def("get_stock", &System::getStock, R"(get_stock(self)
 
@@ -171,9 +168,12 @@ void export_System(py::module& m) {
 
     克隆操作，会依据部件的共享特性进行克隆，共享部件不进行实际的克隆操作，保持共享。)")
 
-      .def("run", run_1, py::arg("query"), py::arg("reset") = true, py::arg("reset_all") = false)
-      .def("run", run_2, py::arg("kdata"), py::arg("reset") = true, py::arg("reset_all") = false)
-      .def("run", run_3, py::arg("stock"), py::arg("query"), py::arg("reset") = true,
+      .def("run", py::overload_cast<const KQuery&, bool, bool>(&System::run), py::arg("query"),
+           py::arg("reset") = true, py::arg("reset_all") = false)
+      .def("run", py::overload_cast<const KData&, bool, bool>(&System::run), py::arg("kdata"),
+           py::arg("reset") = true, py::arg("reset_all") = false)
+      .def("run", py::overload_cast<const Stock&, const KQuery&, bool, bool>(&System::run),
+           py::arg("stock"), py::arg("query"), py::arg("reset") = true,
            py::arg("reset_all") = false,
            R"(run(self, stock, query[, reset=True])
   
