@@ -267,8 +267,6 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         current_dir = os.path.dirname(__file__)
         self.setWindowIcon(QIcon("{}/hikyuu.ico".format(current_dir)))
-        # self.setFixedSize(self.width(), self.height())
-        self.import_status_label.setText('')
         self.import_detail_textEdit.clear()
         self.reset_progress_bar()
         self.day_start_dateEdit.setMinimumDate(datetime.date(1990, 12, 19))
@@ -702,6 +700,9 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.import_running = True
         self.start_import_pushButton.setEnabled(False)
         self.reset_progress_bar()
+
+        if config.getboolean('weight', 'enable', fallback=False):
+            self.hdf5_weight_label.setText("正在导入")
 
         self.import_status_label.setText("正在启动任务....")
         QApplication.processEvents()

@@ -13,18 +13,24 @@
 namespace hku {
 
 class HKU_API WalkForwardSystem : public System {
+    CLASS_LOGGER_IMP(SYS_WalkForward)
+
 public:
     WalkForwardSystem();
-    WalkForwardSystem(const SystemList& candidate_sys_list);
+    WalkForwardSystem(const SystemList& candidate_sys_list, const SelectorPtr& se,
+                      const TradeManagerPtr& train_tm);
     virtual ~WalkForwardSystem() = default;
 
     virtual void readyForRun() override;
     virtual void run(const KData& kdata, bool reset = true, bool resetAll = false) override;
     virtual TradeRecord runMoment(const Datetime& datetime) override;
 
+    virtual void _checkParam(const string& name) const override;
     virtual void _reset() override;
     virtual void _forceResetAll() override;
     virtual SystemPtr _clone() override;
+
+    virtual string str() const override;
 
 public:
     virtual TradeRecord sellForceOnOpen(const Datetime& date, double num, Part from) override;
@@ -34,15 +40,17 @@ public:
     virtual TradeRecord pfProcessDelaySellRequest(const Datetime& date) override;
 
 private:
-    void syncDataFromSystem(const SYSPtr&, const KData&, bool isMoment);
+    void initParam();
+    void syncDataFromSystem(const SYSPtr&, bool isMoment);
     void syncDataToSystem(const SYSPtr&);
 
 private:
-    SystemList m_candidate_sys_list;
-    SEPtr m_se;
+    SEPtr m_se;        // 寻优SE
+    TMPtr m_train_tm;  // 用于优化评估计算的账户
     SYSPtr m_cur_sys;
-    vector<KData> m_kdata_list;
     size_t m_cur_kdata{0};
+    vector<KData> m_train_kdata_list;
+    vector<RunRanges> m_run_ranges;
 
 //========================================
 // 序列化支持
@@ -53,8 +61,8 @@ private:
     template <class Archive>
     void serialize(Archive& ar, const unsigned int version) {
         ar& BOOST_SERIALIZATION_BASE_OBJECT_NVP(System);
-        ar& BOOST_SERIALIZATION_NVP(m_candidate_sys_list);
         ar& BOOST_SERIALIZATION_NVP(m_se);
+        ar& BOOST_SERIALIZATION_NVP(m_train_tm);
     }
 #endif /* HKU_SUPPORT_SERIALIZATION */
 };
