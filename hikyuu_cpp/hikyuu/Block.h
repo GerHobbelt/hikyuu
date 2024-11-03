@@ -43,11 +43,11 @@ public:
         return iter;
     }
 
-    bool operator==(const Block& blk) {
+    bool operator==(const Block& blk) const {
         return m_data == blk.m_data;
     }
 
-    bool operator!=(const Block& blk) {
+    bool operator!=(const Block& blk) const {
         return m_data != blk.m_data;
     }
 
@@ -64,14 +64,14 @@ public:
     /** 设置板块类别 */
     void category(const string& category) {
         if (!m_data)
-            m_data = shared_ptr<Data>(new Data);
+            m_data = make_shared<Data>();
         m_data->m_category = category;
     }
 
     /** 设置名称 */
     void name(const string& name) {
         if (!m_data)
-            m_data = shared_ptr<Data>(new Data);
+            m_data = make_shared<Data>();
         m_data->m_name = name;
     }
 
@@ -159,6 +159,14 @@ private:
 typedef vector<Block> BlockList;
 
 HKU_API std::ostream& operator<<(std::ostream& os, const Block&);
+
+/**
+ * @brief 获取 StockManager 中的 Block
+ * @param category
+ * @param name
+ * @return HKU_API
+ */
+HKU_API Block getBlock(const string& category, const string& name);
 
 } /* namespace hku */
 

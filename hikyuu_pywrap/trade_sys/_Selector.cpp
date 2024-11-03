@@ -26,6 +26,14 @@ public:
         PYBIND11_OVERLOAD_PURE(void, SelectorBase, _calculate, );
     }
 
+    void _addSystem(const SystemPtr& sys) override {
+        PYBIND11_OVERLOAD(void, SelectorBase, _addSystem, sys);
+    }
+
+    void _removeAll() override {
+        PYBIND11_OVERLOAD(void, SelectorBase, _removeAll, );
+    }
+
     SystemWeightList getSelected(Datetime date) override {
         // PYBIND11_OVERLOAD_PURE_NAME(SystemWeightList, SelectorBase, "get_selected", getSelected,
         //                             date);
@@ -142,6 +150,30 @@ void export_Selector(py::module& m) {
     :param Datetime datetime: 指定时刻
     :return: 选取的系统实例列表
     :rtype: SystemList)")
+
+      .def("__add__",
+           [](const SelectorPtr& self, const SelectorPtr& other) { return self + other; })
+      .def("__add__", [](const SelectorPtr& self, double other) { return self + other; })
+      .def("__radd__", [](const SelectorPtr& self, double other) { return self + other; })
+
+      .def("__sub__",
+           [](const SelectorPtr& self, const SelectorPtr& other) { return self - other; })
+      .def("__sub__", [](const SelectorPtr& self, double other) { return self - other; })
+      .def("__rsub__", [](const SelectorPtr& self, double other) { return other - self; })
+
+      .def("__mul__",
+           [](const SelectorPtr& self, const SelectorPtr& other) { return self * other; })
+      .def("__mul__", [](const SelectorPtr& self, double other) { return self * other; })
+      .def("__rmul__", [](const SelectorPtr& self, double other) { return self * other; })
+
+      .def("__truediv__",
+           [](const SelectorPtr& self, const SelectorPtr& other) { return self / other; })
+      .def("__truediv__", [](const SelectorPtr& self, double other) { return self / other; })
+      .def("__rtruediv__", [](const SelectorPtr& self, double other) { return other / self; })
+
+      .def("__and__",
+           [](const SelectorPtr& self, const SelectorPtr& other) { return self & other; })
+      .def("__or__", [](const SelectorPtr& self, const SelectorPtr& other) { return self | other; })
 
         DEF_PICKLE(SEPtr);
 
