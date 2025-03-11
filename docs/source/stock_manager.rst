@@ -197,6 +197,18 @@ StockManager/Block/Stock
         :param str name: 板块名称
         :return: 板块，如找不到返回空Block
         :rtype: Block
+
+    .. py:method:: add_block(self, block)
+
+        将新增独立的板块加入到数据库系统中。注意，如 block 发生变化，需要调用 save_block 进行保存。
+
+        :param Block block: 新增的板块
+
+    .. py:method:: remove_block(self, block)
+
+        从数据库系统中删除板块
+
+        :param Block block: 要删除的板块
         
     .. py:method:: get_block_list(self[, category])
     
@@ -254,7 +266,7 @@ StockManager/Block/Stock
 
     .. py:method:: remove_stock(self, market_code)
 
-        从 sm 中移除 market_code 代表的证券，谨慎使用！！！通常用于移除临时增加的外布 Stock
+        从 sm 中移除 market_code 代表的证券，谨慎使用！！！通常用于移除临时增加的外部 Stock
 
         :param str market_code: 证券市场标识
 

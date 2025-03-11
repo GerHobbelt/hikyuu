@@ -16,7 +16,7 @@ import PyQt5
 
 from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QMessageBox
 from PyQt5.QtCore import pyqtSlot, QObject, pyqtSignal
-from PyQt5.QtGui import QIcon, QTextCursor, QFont
+from PyQt5.QtGui import QIcon, QTextCursor, QFont, QPalette
 
 import mysql.connector
 from mysql.connector import errorcode
@@ -50,11 +50,12 @@ class EmittingStream(QObject):
 
 
 class MyMainWindow(QMainWindow, Ui_MainWindow):
-    def __init__(self, parent=None, capture_output=False, use_dark_style=False):
+    def __init__(self, parent=None, capture_output=False):
         super(MyMainWindow, self).__init__(parent)
         self._capture_output = capture_output  # 捕获Python stdout 输出
-        self._use_dark_style = use_dark_style  # 使用暗黑主题
-        self._text_color = '#FFFFFF' if use_dark_style else '#000000'
+        palette = QApplication.instance().palette()
+        # 获取文字默认颜色
+        self._text_color = palette.color(QPalette.WindowText).name()
         self.setupUi(self)
         self.initUI()
         self.initLogger()
@@ -266,7 +267,9 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.log_textEdit.document().setMaximumBlockCount(1000)
 
         current_dir = os.path.dirname(__file__)
-        self.setWindowIcon(QIcon("{}/hikyuu.ico".format(current_dir)))
+        icon = QIcon(f"{current_dir}/hikyuu_small.png")
+        self.setWindowIcon(icon)
+        QApplication.instance().setWindowIcon(icon)
         self.import_detail_textEdit.clear()
         self.reset_progress_bar()
         self.day_start_dateEdit.setMinimumDate(datetime.date(1990, 12, 19))
@@ -711,6 +714,14 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             QMessageBox.about(self, "错误", str(e))
             return
 
+        now = hikyuu.Datetime.now()
+        today = hikyuu.Datetime.today()
+        if now.day_of_week() not in (0, 6) and hikyuu.TimeDelta(0, 8, 30) < now - today < hikyuu.TimeDelta(0, 15, 45):
+            reply = QMessageBox.question(self, '警告', '交易日8:30-15:45分之间导入数据将导致盘后数据错误，是否仍要继续执行导入?',
+                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply == QMessageBox.No:
+                return
+
         self.import_running = True
         self.start_import_pushButton.setEnabled(False)
         self.reset_progress_bar()
@@ -797,11 +808,7 @@ def start():
     logging.getLogger("requests").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     app = QApplication(sys.argv)
-    use_dark_style = False  # 使用暗黑主题
-    if use_dark_style:
-        import qdarkstyle
-        app.setStyleSheet(qdarkstyle.load_stylesheet(qt_api='pyqt5'))
-    myWin = MyMainWindow(capture_output=True, use_dark_style=use_dark_style)
+    myWin = MyMainWindow(capture_output=True)
     myWin.show()
     sys.exit(app.exec())
 
@@ -822,18 +829,14 @@ if __name__ == "__main__":
     f.setPixelSize(12)
     app.setFont(f)
 
-    use_dark_style = False  # 使用暗黑主题
-    if use_dark_style:
-        import qdarkstyle
-        app.setStyleSheet(qdarkstyle.load_stylesheet(qt_api='pyqt5'))
     if (len(sys.argv) > 1 and sys.argv[1] == '0'):
         FORMAT = '%(asctime)-15s [%(levelname)s]: %(message)s [%(name)s::%(funcName)s]'
         logging.basicConfig(format=FORMAT, level=logging.INFO, handlers=[
             logging.StreamHandler(),
         ])
-        myWin = MyMainWindow(capture_output=False, use_dark_style=use_dark_style)
+        myWin = MyMainWindow(capture_output=False)
     else:
-        myWin = MyMainWindow(capture_output=True, use_dark_style=use_dark_style)
+        myWin = MyMainWindow(capture_output=True)
 
     myWin.show()
     sys.exit(app.exec())

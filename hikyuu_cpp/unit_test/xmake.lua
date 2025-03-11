@@ -45,27 +45,40 @@ function prepare_run(target)
       os.cp("$(projectdir)/test_data", "$(buildir)/$(mode)/$(plat)/$(arch)/lib/")
     end
   
-    if is_plat("windows") then os.cp("$(env BOOST_LIB)/boost_*.dll", "$(buildir)/$(mode)/$(plat)/$(arch)/lib/") end
+    if is_plat("windows") then 
+        os.cp("$(env BOOST_LIB)/boost_*.dll", "$(buildir)/$(mode)/$(plat)/$(arch)/lib/") 
+    end
   
     -- if is_plat("linux") and os.getenv(BOOST_LIB) > "" then
     --   -- 不确定是否需要加入这段才能在fedora下使用
     --   os.cp("$(env BOOST_LIB)/libboost_*.so.*", "$(buildir)/$(mode)/$(plat)/$(arch)/lib/")
     -- end
   
-    if is_plat("macosx") then os.cp("$(env BOOST_LIB)/libboost_*.dylib", "$(buildir)/$(mode)/$(plat)/$(arch)/lib/") end
+    if is_plat("macosx") then
+        os.cp("$(env BOOST_LIB)/libboost_*.dylib", "$(buildir)/$(mode)/$(plat)/$(arch)/lib/") 
+    end
   end
 
 target("unit-test")
     set_kind("binary")
     set_default(false)
 
+    if get_config("leak_check") then
+        if is_plat("macosx") then
+            add_cxflags("-fsanitize=address")
+            add_ldflags("-fsanitize=address")
+        elseif is_plat("linux") then
+            -- 需要 export LD_PRELOAD=libasan.so
+            set_policy("build.sanitizer.address", true)
+            set_policy("build.sanitizer.leak", true)
+            -- set_policy("build.sanitizer.memory", true)
+            -- set_policy("build.sanitizer.thread", true)
+        end
+    end
+
     add_packages("boost", "fmt", "spdlog", "doctest", "sqlite3")
     if get_config("mysql") then
-        if is_plat("macosx") then
-            add_packages("mysqlclient")
-        else
-            add_packages("mysql")
-        end
+        add_packages("mysql")
     end
 
     add_includedirs("..")
@@ -89,13 +102,12 @@ target("unit-test")
         add_shflags("-Wl,-rpath=$ORIGIN", "-Wl,-rpath=$ORIGIN/../lib")
     end
 
-    if is_plat("macosx") then
-        add_includedirs("/usr/local/opt/mysql-client/include")
-        add_linkdirs("/usr/local/opt/mysql-client/lib")
-    end
-
     -- add files
-    add_files("**.cpp|hikyuu/real_data/**")
+    add_files("**.cpp|hikyuu/real_data/**|hikyuu/indicator_talib/**.cpp")
+    
+    if has_config("ta_lib") then
+        add_files("hikyuu/indicator_talib/**.cpp")
+    end
 
     before_run(prepare_run)
     after_run(coverage_report)

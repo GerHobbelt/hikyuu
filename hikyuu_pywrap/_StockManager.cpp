@@ -117,6 +117,28 @@ void export_StockManager(py::module& m) {
     :return: 板块，如找不到返回空Block
     :rtype: Block)")
 
+      .def("add_block", &StockManager::addBlock, R"(add_block(self, block)
+      
+    将独立的板块加入到数据库中， 板块通过 category+name 区分， 数据库中相同板块将被覆盖。注意，如果板块发生变化，需要调用 save_block 重新保存。
+      
+    :param Block block: 板块实例)")
+
+      .def("save_block", &StockManager::saveBlock, R"(save_block(self, block)
+      
+    保存发生变化后的板块保存至数据库
+
+    :param Block block: 板块实例)")
+
+      .def("remove_block",
+           py::overload_cast<const string&, const string&>(&StockManager::removeBlock),
+           py::arg("category"), py::arg("name"))
+      .def("remove_block", py::overload_cast<const Block&>(&StockManager::removeBlock),
+           py::arg("block"), R"(remove_block(self, block)
+           
+    从数据库中删除板块
+    
+    :param Block block: 板块实例)")
+
       .def("get_block_list", py::overload_cast<>(&StockManager::getBlockList))
       .def("get_block_list", py::overload_cast<const string&>(&StockManager::getBlockList),
            R"(get_block_list(self[, category])
@@ -209,7 +231,7 @@ void export_StockManager(py::module& m) {
 
       .def("remove_stock", &StockManager::removeStock, R"(remove_stock(self, market_code)
     
-    从 sm 中移除 market_code 代表的证券，谨慎使用！！！通常用于移除临时增加的外布 Stock
+    从 sm 中移除 market_code 代表的证券，谨慎使用！！！通常用于移除临时增加的外部 Stock
     
     :param str market_code: 证券市场标识)")
 
