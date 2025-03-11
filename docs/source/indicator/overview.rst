@@ -7,15 +7,22 @@
 **辅助类指标**
 
 * :py:func:`ALIGN` - 按指定的参考日期对齐
+* :py:func:`CYCLE` - PF调仓周期指标，主要用于PF调仓日验证，及作为SG
 * :py:func:`CVAL` - 创建指定长度的固定数值指标
 * :py:func:`CONTEXT` - 独立上下文
+* :py:func:`DISCARD` - 以指标公式的方式设置指标结果的丢弃数据量。
 * :py:func:`DROPNA` - 删除 nan 值
+* :py:func:`INBLOCK` - 当前上下文证券是否在指定的板块中。
 * :py:func:`ISNA` - 判断是否为 nan 值
 * :py:func:`ISINF` - 判断是否为 +inf 值
 * :py:func:`ISINFA` - 判断是否为 -inf 值
+* :py:func:`JUMPDOWN` - 边缘跳变，从小于等于0.0，跳变到 > 0.0
+* :py:func:`JUMPUP` - 边缘跳变，从大于0.0，跳变到 <= 0.0
+* :py:func:`LASTVALUE` - 等同于通达信 CONST 指标。取输入指标最后值为常数, 即结果中所有值均为输入指标的最后值, 谨慎使用。含未来函数, 谨慎使用。
 * :py:func:`PRICELIST` - 将PriceList或Indicator的结果集包装为Indicator，同名 VALUE
 * :py:func:`REPLACE` - 替换指标中指定值，默认为替换 nan 值为 0.0
 * :py:func:`RESULT` - 以指标公式的方式返回指定指标中相应的结果集
+* :py:func:`SLICE` - 获取某指标中指定范围 [start, end) 的数据，生成新的指标
 * :py:func:`WEAVE` - 将两个ind的结果合并到一个ind中
 * :py:func:`ZSCORE` - ZScore 标准化
 
@@ -47,6 +54,15 @@
 
 * :py:func:`ADVANCE` - 上涨家数
 * :py:func:`DECLINE` - 下跌家数
+* :py:func:`INDEXO` - 返回对应的大盘开盘价,分别是上证指数,深证成指,科创50,创业板指
+* :py:func:`INDEXH` - 返回对应的大盘最高价,分别是上证指数,深证成指,科创50,创业板指
+* :py:func:`INDEXL` - 返回对应的大盘最低价,分别是上证指数,深证成指,科创50,创业板指
+* :py:func:`INDEXC` - 返回对应的大盘收盘价,分别是上证指数,深证成指,科创50,创业板指
+* :py:func:`INDEXA` - 返回对应的大盘成交金额,分别是上证指数,深证成指,科创50,创业板指
+* :py:func:`INDEXV` - 返回对应的大盘成交量,分别是上证指数,深证成指,科创50,创业板指
+* :py:func:`INDEXADV` - 通达信 880005 大盘上涨家数, 可能无法盘中更新!
+* :py:func:`INDEXDEC` - 通达信 880005 大盘下跌家数, 可能无法盘中更新!
+
 
 **逻辑算术函数**
 
@@ -113,6 +129,7 @@
 **技术指标**
 
 * :py:func:`AD` - 累积/派发线
+* :py:func:`ATR` - 平均真实波动幅度，真实波动幅度 TR 的简单移动均值
 * :py:func:`BACKSET` - 向前赋值将当前位置到若干周期前的数据设为1
 * :py:func:`BARSCOUNT` - 有效值周期数, 求总的周期数。
 * :py:func:`BARSLAST` - 上一次条件成立位置, 上一次条件成立到当前的周期数
@@ -124,6 +141,7 @@
 * :py:func:`FILTER` - 信号过滤, 过滤连续出现的信号
 * :py:func:`HHV` - N日内最高价
 * :py:func:`HHVBARS` - 上一高点位置 求上一高点到当前的周期数
+* :py:func:`KALMAN` - 卡尔曼滤波
 * :py:func:`KDJ` - 经典随机指标
 * :py:func:`LLV` - N日内最低价
 * :py:func:`LLVBARS` - 上一低点位置 求上一低点到当前的周期数
@@ -141,6 +159,7 @@
 * :py:func:`SAFTYLOSS` - 亚历山大 艾尔德安全地带止损线
 * :py:func:`SUM` - 求总和
 * :py:func:`SUMBARS` - 累加到指定周期数, 向前累加到指定值到现在的周期数
+* :py:func:`TR` - 真实波动幅度
 * :py:func:`VIGOR` - 亚历山大.艾尔德力度指数
 
 

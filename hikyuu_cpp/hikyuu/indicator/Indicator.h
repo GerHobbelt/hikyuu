@@ -198,6 +198,8 @@ public:
         return !m_imp && m_imp == other.m_imp;
     }
 
+    string str() const;
+
 protected:
     IndicatorImpPtr m_imp;
 
@@ -383,6 +385,13 @@ HKU_API Indicator operator|(Indicator::value_t, const Indicator&);
  */
 Indicator HKU_API WEAVE(const Indicator& ind1, const Indicator& ind2);
 
+template <typename... Args>
+inline Indicator WEAVE(const Indicator& ind1, const Indicator& ind2, const Args&... others) {
+    HKU_CHECK(sizeof...(others) <= 4, "WEAVE() only support 6 Indicator!");
+    Indicator tmp = WEAVE(ind1, ind2);
+    return WEAVE(std::move(tmp), others...);
+}
+
 /**
  * 条件函数, 根据条件求不同的值。
  * @details
@@ -401,6 +410,21 @@ Indicator HKU_API IF(const Indicator& x, const Indicator& a, Indicator::value_t 
 Indicator HKU_API IF(const Indicator& x, Indicator::value_t a, Indicator::value_t b);
 
 } /* namespace hku */
+
+namespace std {
+template <>
+class hash<hku::Indicator> {
+public:
+    size_t operator()(hku::Indicator const& ind) const noexcept {
+        auto imp = ind.getImp();
+        return imp.get() ? std::hash<hku::IndicatorImpPtr>()(imp) : 0;
+    }
+};
+
+inline string to_string(const hku::Indicator& ind) {
+    return ind.str();
+}
+}  // namespace std
 
 #if FMT_VERSION >= 90000
 template <>

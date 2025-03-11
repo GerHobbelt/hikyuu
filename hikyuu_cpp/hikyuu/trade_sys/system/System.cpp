@@ -8,6 +8,10 @@
 #include "hikyuu/global/sysinfo.h"
 #include "System.h"
 
+#if HKU_SUPPORT_SERIALIZATION
+BOOST_CLASS_EXPORT(hku::System)
+#endif
+
 namespace hku {
 
 HKU_API std::ostream& operator<<(std::ostream& os, const System& sys) {
@@ -472,6 +476,11 @@ TradeRecord System::_runMoment(const KRecord& today, const KRecord& src_today) {
          today.closePrice < today.lowPrice) &&
         !getParam<bool>("can_trade_when_high_eq_low")) {
         HKU_INFO_IF(trace, "[{}] ignore current highPrice == lowPrice", name());
+        return result;
+    }
+
+    if (iszero(today.transAmount) || iszero(today.transCount)) {
+        HKU_INFO_IF(trace, "[{}] ignore current amount == 0 or count == 0", name());
         return result;
     }
 

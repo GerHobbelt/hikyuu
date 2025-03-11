@@ -28,8 +28,8 @@ void export_Indicator(py::module& m) {
     py::class_<Indicator>(m, "Indicator", "技术指标")
       .def(py::init<>())
       .def(py::init<IndicatorImpPtr>(), py::keep_alive<1, 2>())
-      .def("__str__", to_py_str<Indicator>)
-      .def("__repr__", to_py_str<Indicator>)
+      .def("__str__", &Indicator::str)
+      .def("__repr__", &Indicator::str)
 
       .def_property("name", ind_read_name, ind_write_name, "指标名称")
       .def_property_readonly("long_name", &Indicator::long_name,
@@ -102,9 +102,19 @@ void export_Indicator(py::module& m) {
     :param int result_index: 指定的结果集
     :rtype: float)")
 
-      .def("get_pos", &Indicator::getPos, R"(get_pos(self, date):
+      .def(
+        "get_pos",
+        [](const Indicator& self, const Datetime& d) {
+            size_t pos = self.getPos(d);
+            py::object ret = py::none();
+            if (pos != Null<size_t>()) {
+                ret = py::int_(pos);
+            }
+            return ret;
+        },
+        R"(get_pos(self, date):
 
-    获取指定日期相应的索引位置
+    获取指定日期相应的索引位置, 如果没有对应位置返回 None
 
     :param Datetime date: 指定日期
     :rtype: int)")
@@ -183,6 +193,8 @@ set_context(self, stock, query)
       .def("__call__", ind_call_1)
       .def("__call__", ind_call_2)
       .def("__call__", ind_call_3)
+
+      .def("__hash__", [](const Indicator& self) { return std::hash<Indicator>()(self); })
 
       .def(
         "to_np",

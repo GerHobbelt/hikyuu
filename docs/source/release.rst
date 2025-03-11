@@ -1,6 +1,95 @@
 版本发布说明
 =======================
 
+2.5.3 - 2025年3月7日
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+1. 新增特性
+    - 调整数据加载策略, load_hikyuu 中传入的加载参数优先于默认配置文件, 同时增加 preload_num 参数控制预加载数量
+    - 新增指标 KALMAN(卡尔曼滤波), TR(真实波动幅度)
+    - 优化 Hub 功能
+        - 改进 help_part 以便 get_part 默认参数
+        - 增加 label 参数, 并支持搜索
+        - 添加 get_part_list 函数
+        - 优化 get_part 性能
+
+    - EV 支持加、减、乘、除、与、或等逻辑运算
+    - 支持后缀表示法 000001.sh
+    - sys, pf 添加 heatmap 方法，绘制系统收益的年-月热力图功能
+
+2. 功能优化
+    - WEAVE、SG 支持多参数或列表输入
+    - 优化 crtMM 函数的卖出数量接口, get_sell_num 增加默认值, 可为 None
+    - Hikyuutdx 分钟级数据导入时增加保护; 补充创业板302段
+    - 为 evplot 和 cnplot 函数增加颜色和透明度参数
+    - 支持macosx下 hub 使用c++部件
+    - 对 null stock 调用 setKRecordList 增加保护
+
+3. 缺陷修复
+    - fixed ATR 计算
+    - fixed PF_WithoutAF 在未指定 tm 时崩溃
+    - fixed serielize 多重继承时可能造成内存泄露
+    - fix: TradeManager 在保存交易动作记录时, 如果m_costfunc为空导致崩溃
+
+
+
+2.5.2 - 2025年2月24日
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+1. fixed SG四则运算在超过两个时, 如: sg1 + sg2 + sg3 时未计算
+2. 增加 SG_Add/SG_Mul/SG_Sub/SG_Div 辅助 SG 四则运算, 控制 alternate 影响
+3. 增加 help_part 方法, 查看 part 帮助信息
+4. fixed sysplot在传入axes参数进行多图绘制时BUG
+5. KData.get_pos 方法改用 c++ 内实现
+6. PositionRecord 增加 total_profit 属性, 简化每次手工计算
+
+
+2.5.1 - 2025年2月21日
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+fixed python 3.12 版本以下地域板块导入失败
+
+
+2.5.0 - 2025年2月20日
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+1. 新增特性
+    - 新增指标 WINNER/INBLOCK/DISCARD/LASTVALUE(CONST)/CYCLE/JUMPUP/JUMPDOWN
+    - PF 增加无资金分配模式,调整 PF_WithoutAF; 同时调整了 run接口, 参数改为在创建PF时指定, 以便 hub 组件固定模板
+    - SG 增强, 支持值(强度), 加减乘除四则运算及与或逻辑运算
+    - 新增资金管理算法: MM_FixedCapitalFunds, MM_FixedCountTps
+    - 新增 SG_OneSide 单边信号，主要用于 SG 四则运算
+    - 新增 AF_FixedWeightList
+
+2. 功能优化
+    - HikyuuTDX 优化 增加提示信息: HDF5存储不可同时读写; 数据导入尝试对增加对服务器的校验，防止错误数据导入; 更新地域板块获取详情,优化板块导入; 添加及调整北证50指数导入
+    - 调整库加载方式, 支持直接导入库，通过 load_hikyuu 进行数据加载
+    - 调整 MM 子类接口 buyNotify、sellNotify 为_buyNotify、_sellNotify, 增加连续交易计数
+    - 改进 HSL, COST, LIUTONGPAN 指标计算
+    - 优化 INDEXC/INDEXO 等为使用对应的大盘指数
+    - HSL换手率结果调整为比例, 如需要百分比, 需自行乘以100
+    - STICKLINE width 参数类型改为 float
+    - 优化 TradeManager.tocsv, 如果列数长度不一致, 有些软件无法正常显示csv
+    - Stock 增加 getTradingCalendar 便捷方法，根据自身所属市场获取市场交易日历
+    - MF_MultiFactor 增加 ignore_le_zero 参数
+    - AF添加公共参数ignore_se_score_is_null, ignore_se_score_lt_zero
+    - 优化 SE_MultiFactor 调整 only_should_buy 只选择同时存在买入信号的参与排序
+
+3. 缺陷修复
+    - fixed: the importdata can not stop automatically after task finished!
+    - fixed pyecharts 绘图 dataZoom opts issure
+    - fixed DMA python 导出 fill_null 默认参数
+    - fixed parallelIndexRange
+    - fixed 修复demo2自定义资金管理获取卖出数量未被调用问题
+    - fixed IDma result_num
+    - fixed compile for serialize=n
+    - fixed Parameter python <--> c++ 互转
+    - fixed ST_Indicator 取消 OP 后遗留未调整修改部分
+    - fixed DRAWIMG 添加 nan 保护
+    - fixed SG参数变化后重新计算时参数未生效
+    - fixed xmake.lua 查找python路径(影响 MacOsx 下编译)
+
+
 2.3.1 - 2025年1月18日
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

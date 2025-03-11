@@ -87,11 +87,11 @@
     :rtype: Indicator
 
 
-.. py:function:: ATR([data, n=14])
+.. py:function:: ATR([kdata, n=14])
 
-    平均真实波幅(Average True Range)
+    平均真实波幅(Average True Range), 真实波动幅度 TR 的简单移动均值
 
-    :param Indicator data 待计算的源数据
+    :param KData kdata 待计算的源数据
     :param int n: 计算均值的周期窗口，必须为大于1的整数
     :rtype: Indicator
 
@@ -212,6 +212,18 @@
     :param data: 输入数据
     :rtype: Indicator
    
+
+.. py:function:: CYCLE(kdata, [adjust_cycle=1], [adjust_mode='query'], [delay_to_trading_day=True])
+          
+    PF调仓周期指标，主要用于PF调仓日验证，及作为SG
+
+    :param KData kdata: K线数据
+    :param int adjust_cycle: 调整周期
+    :param string adjust_mode: 调整方式
+    :param bool delay_to_trading_day: 调整周期是否延至交易日
+    :rtype: Indicator
+
+
 .. py:function:: CONTEXT(ind)
     
     独立上下文。使用 ind 自带的上下文。当指定新的上下文时，不会改变已有的上下文。
@@ -332,6 +344,15 @@
     差分指标，即data[i] - data[i-1]
     
     :param Indicator data: 输入数据
+    :rtype: Indicator
+
+
+.. py:function:: DISCARD(data, discard)
+    
+    以指标公式的方式设置指标结果的丢弃数据量。
+
+    :param Indicator data: 指标
+    :param int discard: 丢弃数据量
     :rtype: Indicator
 
 
@@ -547,6 +568,56 @@
     :rtype: Indicator
     
 
+.. py:function:: INBLOCK(data, category, name)        
+
+    当前上下文证券是否在指定的板块中。
+
+    :param KData data: 指定的K线数据(上下文)
+    :param string category: 板块类别
+    :param string name: 板块名称
+    :rtype: Indicator
+
+
+.. py:function:: INDEXC([kdata])
+    
+    返回对应的大盘收盘价,分别是上证指数,深证成指,科创50,创业板指
+
+
+.. py:function:: INDEXH([kdata])
+    
+    返回对应的大盘最高价,分别是上证指数,深证成指,科创50,创业板指
+
+
+.. py:function:: INDEXL([kdata])
+
+    返回对应的大盘最低价,分别是上证指数,深证成指,科创50,创业板指
+
+
+.. py:function:: INDEXO([kdata])
+    
+    返回对应的大盘开盘价,分别是上证指数,深证成指,科创50,创业板指
+
+
+.. py:function:: INDEXA([kdata])
+    
+    返回对应的大盘成交金额,分别是上证指数,深证成指,科创50,创业板指
+
+
+.. py:function:: INDEXV([kdata])
+
+    返回对应的大盘成交量,分别是上证指数,深证成指,科创50,创业板指
+
+
+.. py:function:: INDEXADV([query])
+    
+    通达信 880005 大盘上涨家数, 可能无法盘中更新!
+
+
+.. py:function:: INDEXDEC([query])
+    
+    通达信 880005 大盘下跌家数, 可能无法盘中更新!
+
+
 .. py:function:: INSUM(block, query, ind, mode)
 
     返回板块各成分该指标相应输出按计算类型得到的计算值.计算类型:0-累加,1-平均数,2-最大值,3-最小值.
@@ -593,6 +664,32 @@
     判断指标是否为负无穷大 (-inf) 值，若为 -inf 值, 则返回1, 否则返回0。如判断正无穷大, 使用 ISINF。
 
     :param Indicator ind: 指定指标
+    :rtype: Indicator
+
+
+.. py:function:: JUMPDOWN([ind])
+
+    边缘跳变，从小于等于0.0，跳变到 > 0.0
+    
+    :param Indicator ind: 指标
+    :rtype: Indicator
+
+
+.. py:function:: JUMPUP([ind])
+    
+    边缘跳变，从大于0.0，跳变到 <= 0.0
+    
+    :param Indicator ind: 指标
+    :rtype: Indicator
+
+
+.. py:function:: KALMAN(ind, [q=0.01], [r=0.1])
+
+    Kalman滤波器, 用于平滑指标, 可设置平滑系数q和r, 默认q=0.01, r=0.1
+
+    :param Indicator ind: 指标
+    :param float q: 平滑系数
+    :param float r: 噪声系数
     :rtype: Indicator
 
     
@@ -642,6 +739,15 @@
     :param data: 输入数据
     :param int m: m周期
     :param int n: n周期
+    :rtype: Indicator
+
+
+.. py:function:: LASTVALUE(ind, [ignore_discard=False])
+
+    等同于通达信CONST指标。取输入指标最后值为常数, 即结果中所有值均为输入指标的最后值, 谨慎使用。含未来函数, 谨慎使用。
+
+    :param Indicator ind: 指标
+    :param bool ignore_discard: 忽略指标丢弃数据
     :rtype: Indicator
 
 
@@ -878,7 +984,7 @@
     :rtype: Indicator
 
 
-.. py:function:: REPLACE(ind, [old_value=constant.nan, new_value=0.0, ignore_discard=False]
+.. py:function:: REPLACE(ind, [old_value=constant.nan, new_value=0.0, ignore_discard=False])
           
     替换指标中指定值，默认为替换 nan 值为 0.0。
 
@@ -1142,6 +1248,17 @@
     :rtype: Indicator
 
 
+.. py:function:: TR([kdata])
+
+    真实波动幅度(TR)是以下三个值中的最大值:
+    1. 当前周期最高价与最低价之差
+    2. 当前周期最高价与前一周期收盘价之差的绝对值
+    3. 当前周期最低价与前一周期收盘价之差的绝对值
+
+    :param KData kdata: K线数据
+    :rtype: Indicator
+
+
 .. py:function:: UPNDAY(data[, n=3])
 
     连涨周期数, UPNDAY(CLOSE,M)表示连涨M个周期
@@ -1188,12 +1305,16 @@
     :rtype: Indicator
 
 
-.. py:function:: WEAVE(ind1, ind2)
+.. py:function:: WEAVE(ind1, ind2[, ind3, ind4, ind5, ind6])
 
-    将ind1和ind2的结果组合在一起放在一个Indicator中。如ind = WEAVE(ind1, ind2), 则此时ind包含多个结果，按ind1、ind2的顺序存放。
+    将最多6个Indicator的结果组合在一起放在一个Indicator中。如ind = WEAVE(ind1, ind2), 则此时ind包含多个结果，按ind1、ind2的顺序存放。
     
     :param Indicator ind1: 指标1
     :param Indicator ind2: 指标2
+    :param Indicator ind3: 指标3, 可省略
+    :param Indicator ind4: 指标4, 可省略
+    :param Indicator ind5: 指标5, 可省略
+    :param Indicator ind6: 指标6, 可省略
     :rtype: Indicator
 
 
@@ -1203,6 +1324,17 @@
 
     :param data: 输入数据 KData
     :rtype: Indicator
+
+
+.. py:function:: WINNER([ind])
+    
+    获利盘比例
+
+    用法: WINNER(CLOSE)　表示以当前收市价卖出的获利盘比例。
+
+    例如: 返回0.1表示10%获利盘;WINNER(10.5)表示10.5元价格的获利盘比例
+
+    该函数仅对日线分析周期有效，且仅对存在流通盘权息数据的证券有效，对指数、基金等无效。
 
 
 .. py:function:: YEAR([data])

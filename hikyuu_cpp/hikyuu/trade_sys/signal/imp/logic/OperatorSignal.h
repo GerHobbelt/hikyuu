@@ -18,7 +18,8 @@ public:
     OperatorSignal(const string& name, const SignalPtr& sg1, const SignalPtr& sg2);
     virtual ~OperatorSignal();
 
-    virtual void _reset() override;
+    virtual void _reset() override final;
+
     virtual SignalPtr _clone() override;
     virtual void _calculate(const KData& kdata) override {}
 
@@ -59,6 +60,7 @@ private:                                                         \
     friend class boost::serialization::access;                   \
     template <class Archive>                                     \
     void serialize(Archive& ar, const unsigned int version) {    \
+        ar& BOOST_SERIALIZATION_BASE_OBJECT_NVP(SignalBase);     \
         ar& BOOST_SERIALIZATION_BASE_OBJECT_NVP(OperatorSignal); \
     }
 #else
