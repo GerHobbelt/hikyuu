@@ -6,7 +6,7 @@ set_project("hikyuu")
 add_rules("mode.debug", "mode.release")
 
 -- version
-set_version("2.2.4", {build = "%Y%m%d%H%M"})
+set_version("2.3.0", {build = "%Y%m%d%H%M"})
 
 set_warnings("all")
 
@@ -111,7 +111,7 @@ set_configvar("HKU_ENABLE_HTTP_CLIENT_SSL", get_config("http_client_ssl") and 1 
 set_configvar("HKU_ENABLE_HTTP_CLIENT_ZIP", get_config("http_client_zip") and 1 or 0)
 set_configvar("HKU_ENABLE_NODE", 1)
 
-local boost_version = "1.86.0"
+local boost_version = "1.87.0"
 local hdf5_version = "1.12.2"
 local fmt_version = "11.0.2"
 local flatbuffers_version = "24.3.25"
@@ -148,9 +148,9 @@ add_requires("boost " .. boost_version, {
   },
 })
 
-add_requires("fmt", {configs = {header_only = true}})
+add_requires("fmt " .. fmt_version, {configs = {header_only = true}})
 add_requires("spdlog", {configs = {header_only = true, fmt_external = true}})
-add_requireconfs("spdlog.fmt", {override = true, configs = {header_only = true}})
+add_requireconfs("spdlog.fmt", {override = true, version=fmt_version, configs = {header_only = true}})
 add_requires("sqlite3 " .. sqlite_version, {configs = {shared = true, safe_mode="2", cxflags = "-fPIC"}})
 add_requires("flatbuffers v" .. flatbuffers_version, {system = false, configs= {runtimes = get_config("runtimes")}})
 add_requires("nng " .. nng_version, {configs = {NNG_ENABLE_TLS = has_config("http_client_ssl"), cxflags = "-fPIC"}})

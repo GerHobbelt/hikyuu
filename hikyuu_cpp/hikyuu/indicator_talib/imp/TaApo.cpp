@@ -5,7 +5,7 @@
  *      Author: fasiondog
  */
 
-#include "ta_func.h"
+#include <ta-lib/ta_func.h>
 #include "TaApo.h"
 
 #if HKU_SUPPORT_SERIALIZATION
@@ -36,26 +36,24 @@ void TaApo::_calculate(const Indicator& data) {
     TA_MAType matype = (TA_MAType)getParam<int>("matype");
     size_t total = data.size();
     int lookback = TA_APO_Lookback(fast_n, slow_n, matype);
-    HKU_IF_RETURN(lookback < 0, void());
-
-    _readyBuffer(total, 1);
-
-    const double* src = data.data();
-    auto* dst = this->data();
+    if (lookback >= total || lookback < 0) {
+        m_discard = total;
+        return;
+    }
 
     m_discard = data.discard() + lookback;
+    if (m_discard >= total) {
+        m_discard = total;
+        return;
+    }
+
+    const double* src = data.data();
+    double* dst = this->data();
     int outBegIdx;
     int outNbElement;
-    TA_APO(data.discard(), total - 1, src, fast_n, slow_n, matype, &outBegIdx, &outNbElement,
+    TA_APO(m_discard, total - 1, src, fast_n, slow_n, matype, &outBegIdx, &outNbElement,
            dst + m_discard);
-    if (outBegIdx != m_discard) {
-        memmove(dst + outBegIdx, dst + m_discard, sizeof(double) * outNbElement);
-        double null_double = Null<double>();
-        for (size_t i = m_discard; i < outBegIdx; ++i) {
-            _set(null_double, i);
-        }
-        m_discard = outBegIdx;
-    }
+    HKU_ASSERT((outBegIdx == m_discard) && (outBegIdx + outNbElement) <= total);
 }
 
 Indicator HKU_API TA_APO(int fast_n, int slow_n, int matype) {

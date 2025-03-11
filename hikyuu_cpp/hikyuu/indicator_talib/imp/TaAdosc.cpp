@@ -5,7 +5,7 @@
  *      Author: fasiondog
  */
 
-#include "ta_func.h"
+#include <ta-lib/ta_func.h>
 #include "TaAdosc.h"
 
 #if HKU_SUPPORT_SERIALIZATION
@@ -48,6 +48,14 @@ void TaAdosc::_calculate(const Indicator& data) {
 
     _readyBuffer(total, 1);
 
+    int fast_n = getParam<int>("fast_n");
+    int slow_n = getParam<int>("slow_n");
+    int back = TA_ADOSC_Lookback(fast_n, slow_n);
+    if (back < 0 || back >= total) {
+        m_discard = total;
+        return;
+    }
+
     const KRecord* kptr = k.data();
     std::unique_ptr<double[]> buf = std::make_unique<double[]>(4 * total);
     double* high = buf.get();
@@ -61,18 +69,13 @@ void TaAdosc::_calculate(const Indicator& data) {
         vol[i] = kptr[i].transCount;
     }
 
-    auto* dst = this->data();
-
-    int fast_n = getParam<int>("fast_n");
-    int slow_n = getParam<int>("slow_n");
-    int back = TA_ADOSC_Lookback(fast_n, slow_n);
-    HKU_IF_RETURN(back < 0, void());
-
     m_discard = back;
+    auto* dst = this->data();
     int outBegIdx;
     int outNbElement;
-    TA_ADOSC(0, total - 1, high, low, close, vol, fast_n, slow_n, &outBegIdx, &outNbElement,
+    TA_ADOSC(m_discard, total - 1, high, low, close, vol, fast_n, slow_n, &outBegIdx, &outNbElement,
              dst + m_discard);
+    HKU_ASSERT(m_discard == outBegIdx);
 }
 
 Indicator HKU_API TA_ADOSC(int fast_n, int slow_n) {

@@ -565,8 +565,8 @@ try:
 
     def PYTA_SAREXT(
         ind=None,
-        startvalue=0,
-        offsetonreverse=0,
+        startvalue=0.,
+        offsetonreverse=0.,
         accelerationinitlong=0.02,
         accelerationlong=0.02,
         accelerationmaxlong=0.02,
@@ -600,7 +600,7 @@ try:
 
     PYTA_SMA.__doc__ = talib.SMA.__doc__
 
-    def PYTA_STDDEV(ind=None, timeperiod=5, nbdev=1):
+    def PYTA_STDDEV(ind=None, timeperiod=5, nbdev=1.0):
         imp = crtTaIndicatorImp(ta.STDDEV, 'PYTA_STDDEV', result_num=1, params={
                                 'timeperiod': timeperiod, 'nbdev': nbdev})
         return Indicator(imp)(ind) if ind else Indicator(imp)
@@ -728,7 +728,7 @@ try:
 
     PYTA_ULTOSC.__doc__ = talib.ULTOSC.__doc__
 
-    def PYTA_VAR(ind=None, timeperiod=5, nbdev=1):
+    def PYTA_VAR(ind=None, timeperiod=5, nbdev=1.):
         imp = crtTaIndicatorImp(ta.VAR, 'PYTA_VAR', result_num=1, params={'timeperiod': timeperiod, 'nbdev': nbdev})
         return Indicator(imp)(ind) if ind else Indicator(imp)
 
