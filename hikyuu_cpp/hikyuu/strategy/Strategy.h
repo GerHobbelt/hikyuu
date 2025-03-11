@@ -133,8 +133,8 @@ private:
 
     /** 向线程池提交任务 */
     template <typename FunctionType>
-    event_handle<typename std::result_of<FunctionType()>::type> event(FunctionType f) {
-        typedef typename std::result_of<FunctionType()>::type result_type;
+    auto event(FunctionType f) {
+        typedef typename std::invoke_result<FunctionType>::type result_type;
         std::packaged_task<result_type()> task(f);
         event_handle<result_type> res(task.get_future());
         m_event_queue.push(std::move(task));
@@ -169,13 +169,12 @@ void HKU_API runInStrategy(const SYSPtr& sys, const Stock& stk, const KQuery& qu
  * @note 目前仅支持 buy_delay| sell_delay 均为 false 的系统，即 close 时执行交易
  * @param pf 资产组合
  * @param query 查询条件
- * @param adjust_cycle 调仓周期
  * @param broker 订单代理（专用与和账户资产同步的订单代理）
  * @param costfunc 成本函数
  * @param other_brokers 其他的订单代理
  */
-void HKU_API runInStrategy(const PFPtr& pf, const KQuery& query, int adjust_cycle,
-                           const OrderBrokerPtr& broker, const TradeCostPtr& costfunc,
+void HKU_API runInStrategy(const PFPtr& pf, const KQuery& query, const OrderBrokerPtr& broker,
+                           const TradeCostPtr& costfunc,
                            const std::vector<OrderBrokerPtr>& other_brokers = {});
 
 /**

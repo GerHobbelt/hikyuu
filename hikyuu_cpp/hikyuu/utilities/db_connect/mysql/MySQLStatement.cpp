@@ -30,7 +30,7 @@ MySQLStatement::MySQLStatement(DBConnectBase* driver, const std::string& sql_sta
   m_meta_result(nullptr),
   m_needs_reset(false),
   m_has_bind_result(false) {
-    MySQLConnect* connect = dynamic_cast<MySQLConnect*>(driver);
+    const MySQLConnect* connect = dynamic_cast<MySQLConnect*>(driver);
     HKU_CHECK(connect, "Failed create statement: {}! Failed dynamic_cast<MySQLConnect*>!",
               sql_statement);
 
@@ -313,7 +313,7 @@ int MySQLStatement::sub_getNumColumns() const {
 }
 
 void MySQLStatement::sub_getColumnAsInt64(int idx, int64_t& item) {
-    HKU_CHECK(idx < m_result_buffer.size(), "idx out of range! idx: {}, total: {}",
+    HKU_CHECK(idx < m_result_buffer.size(), "idx out of range! idx: {}, total: {}", idx,
               m_result_buffer.size());
 
     HKU_CHECK(m_result_error[idx] == 0, "Error occurred in sub_getColumnAsint64_t! idx: {}", idx);
@@ -345,7 +345,7 @@ void MySQLStatement::sub_getColumnAsInt64(int idx, int64_t& item) {
 }
 
 void MySQLStatement::sub_getColumnAsDouble(int idx, double& item) {
-    HKU_CHECK(idx < m_result_buffer.size(), "idx out of range! idx: {}, total: {}",
+    HKU_CHECK(idx < m_result_buffer.size(), "idx out of range! idx: {}, total: {}", idx,
               m_result_buffer.size());
 
     HKU_CHECK(m_result_error[idx] == 0, "Error occurred in sub_getColumnAsDouble! idx: {}", idx);
@@ -373,7 +373,7 @@ void MySQLStatement::sub_getColumnAsDouble(int idx, double& item) {
 }
 
 void MySQLStatement::sub_getColumnAsDatetime(int idx, Datetime& item) {
-    HKU_CHECK(idx < m_result_buffer.size(), "idx out of range! idx: {}, total: {}",
+    HKU_CHECK(idx < m_result_buffer.size(), "idx out of range! idx: {}, total: {}", idx,
               m_result_buffer.size());
 
     HKU_CHECK(m_result_error[idx] == 0, "Error occurred in sub_getColumnAsDatetime! idx: {}", idx);
@@ -404,7 +404,7 @@ void MySQLStatement::sub_getColumnAsDatetime(int idx, Datetime& item) {
 }
 
 void MySQLStatement::sub_getColumnAsText(int idx, std::string& item) {
-    HKU_CHECK(idx < m_result_buffer.size(), "idx out of range! idx: {}, total: {}",
+    HKU_CHECK(idx < m_result_buffer.size(), "idx out of range! idx: {}, total: {}", idx,
               m_result_buffer.size());
 
     HKU_CHECK(m_result_error[idx] == 0, "Error occurred in sub_getColumnAsText! idx: {}", idx);
@@ -427,7 +427,7 @@ void MySQLStatement::sub_getColumnAsText(int idx, std::string& item) {
 }
 
 void MySQLStatement::sub_getColumnAsBlob(int idx, std::string& item) {
-    HKU_CHECK(idx < m_result_buffer.size(), "idx out of range! idx: {}, total: {}",
+    HKU_CHECK(idx < m_result_buffer.size(), "idx out of range! idx: {}, total: {}", idx,
               m_result_buffer.size());
 
     HKU_CHECK(m_result_error[idx] == 0, "Error occurred in sub_getColumnAsBlob! idx: {}", idx);
@@ -450,7 +450,7 @@ void MySQLStatement::sub_getColumnAsBlob(int idx, std::string& item) {
 }
 
 void MySQLStatement::sub_getColumnAsBlob(int idx, std::vector<char>& item) {
-    HKU_CHECK(idx < m_result_buffer.size(), "idx out of range! idx: {}, total: {}",
+    HKU_CHECK(idx < m_result_buffer.size(), "idx out of range! idx: {}, total: {}", idx,
               m_result_buffer.size());
 
     HKU_CHECK(m_result_error[idx] == 0, "Error occurred in sub_getColumnAsBlob! idx: {}", idx);

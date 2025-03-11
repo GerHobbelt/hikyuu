@@ -58,6 +58,11 @@ void export_Strategy(py::module& m) {
             auto new_func = [=](const Stock& stk, const SpotRecord& spot) {
                 try {
                     c_func(stk, spot);
+                } catch (py::error_already_set& e) {
+                    if (e.matches(PyExc_KeyboardInterrupt)) {
+                        HKU_INFO("KeyboardInterrupt");
+                        raise(SIGTERM);
+                    }
                 } catch (const std::exception& e) {
                     HKU_ERROR(e.what());
                 } catch (...) {
@@ -80,6 +85,11 @@ void export_Strategy(py::module& m) {
             auto new_func = [=](Datetime revTime) {
                 try {
                     c_func(revTime);
+                } catch (py::error_already_set& e) {
+                    if (e.matches(PyExc_KeyboardInterrupt)) {
+                        HKU_INFO("KeyboardInterrupt");
+                        raise(SIGTERM);
+                    }
                 } catch (const std::exception& e) {
                     HKU_ERROR(e.what());
                 } catch (...) {
@@ -135,6 +145,11 @@ void export_Strategy(py::module& m) {
             auto new_func = [=]() {
                 try {
                     c_func();
+                } catch (py::error_already_set& e) {
+                    if (e.matches(PyExc_KeyboardInterrupt)) {
+                        HKU_INFO("KeyboardInterrupt");
+                        raise(SIGTERM);
+                    }
                 } catch (const std::exception& e) {
                     HKU_ERROR(e.what());
                 } catch (...) {
@@ -173,10 +188,10 @@ void export_Strategy(py::module& m) {
     :param other_brokers: 其他的订单代理)");
 
     m.def("run_in_strategy",
-          py::overload_cast<const PFPtr&, const KQuery&, int, const OrderBrokerPtr&,
-                            const TradeCostPtr&, const std::vector<OrderBrokerPtr>&>(runInStrategy),
-          py::arg("pf"), py::arg("query"), py::arg("adjust_cycle"), py::arg("broker"),
-          py::arg("cost_func"), py::arg("other_brokers") = std::vector<OrderBrokerPtr>(),
+          py::overload_cast<const PFPtr&, const KQuery&, const OrderBrokerPtr&, const TradeCostPtr&,
+                            const std::vector<OrderBrokerPtr>&>(runInStrategy),
+          py::arg("pf"), py::arg("query"), py::arg("broker"), py::arg("cost_func"),
+          py::arg("other_brokers") = std::vector<OrderBrokerPtr>(),
           R"(run_in_strategy(pf, query, adjust_cycle, broker, costfunc, [other_brokers=[]])
           
     在策略运行时中执行组合策略 PF
@@ -184,7 +199,6 @@ void export_Strategy(py::module& m) {
 
     :param Portfolio pf: 资产组合
     :param Query query: 查询条件
-    :param int adjust_cycle: 调仓周期
     :param broker: 订单代理（专用与和账户资产同步的订单代理）
     :param costfunc: 成本函数
     :param other_brokers: 其他的订单代理)");
@@ -194,10 +208,9 @@ void export_Strategy(py::module& m) {
           py::arg("other_brokers") = std::vector<OrderBrokerPtr>(), py::arg("name") = "SYSStrategy",
           py::arg("config") = "");
 
-    m.def("crt_pf_strategy", crtPFStrategy, py::arg("pf"), py::arg("query"),
-          py::arg("adjust_cycle"), py::arg("broker"), py::arg("cost_func"),
-          py::arg("name") = "PFStrategy", py::arg("other_brokers") = std::vector<OrderBrokerPtr>(),
-          py::arg("config") = "");
+    m.def("crt_pf_strategy", crtPFStrategy, py::arg("pf"), py::arg("query"), py::arg("broker"),
+          py::arg("cost_func"), py::arg("name") = "PFStrategy",
+          py::arg("other_brokers") = std::vector<OrderBrokerPtr>(), py::arg("config") = "");
 
     m.def("get_data_from_buffer_server", getDataFromBufferServer);
 }

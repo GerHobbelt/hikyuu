@@ -22,12 +22,12 @@ public:
         PYBIND11_OVERLOAD(void, MoneyManagerBase, _reset, );
     }
 
-    void buyNotify(const TradeRecord& tr) override {
-        PYBIND11_OVERLOAD_NAME(void, MoneyManagerBase, "buy_notify", buyNotify, tr);
+    void _buyNotify(const TradeRecord& tr) override {
+        PYBIND11_OVERLOAD_NAME(void, MoneyManagerBase, "_buy_notify", _buyNotify, tr);
     }
 
-    void sellNotify(const TradeRecord& tr) override {
-        PYBIND11_OVERLOAD_NAME(void, MoneyManagerBase, "sell_notify", sellNotify, tr);
+    void _sellNotify(const TradeRecord& tr) override {
+        PYBIND11_OVERLOAD_NAME(void, MoneyManagerBase, "_sell_notify", _sellNotify, tr);
     }
 
     double _getBuyNumber(const Datetime& datetime, const Stock& stock, price_t price, price_t risk,
@@ -69,8 +69,8 @@ void export_MoneyManager(py::module& m) {
 
 自定义资金管理策略接口：
 
-    - buyNotify : 【可选】接收实际买入通知，预留用于多次增减仓处理
-    - sellNotify : 【可选】接收实际卖出通知，预留用于多次增减仓处理
+    - _buyNotify : 【可选】接收实际买入通知，预留用于多次增减仓处理
+    - _sellNotify : 【可选】接收实际卖出通知，预留用于多次增减仓处理
     - _getBuyNumber : 【必须】获取指定交易对象可买入的数量
     - _getSellNumber : 【可选】获取指定交易对象可卖出的数量，如未重载，默认为卖出全部已持仓数量
     - _reset : 【可选】重置私有属性
@@ -91,6 +91,9 @@ void export_MoneyManager(py::module& m) {
                     "设置或获取交易管理对象")
       .def_property("query", &MoneyManagerBase::getQuery, &MoneyManagerBase::setQuery,
                     py::return_value_policy::copy, "设置或获取查询条件")
+
+      .def("current_buy_count", &MoneyManagerBase::currentBuyCount, "当前连续买入计数")
+      .def("current_sell_count", &MoneyManagerBase::currentSellCount, "当前连续卖出计数")
 
       .def("get_param", &MoneyManagerBase::getParam<boost::any>, R"(get_param(self, name)
 
@@ -113,15 +116,15 @@ void export_MoneyManager(py::module& m) {
       .def("reset", &MoneyManagerBase::reset, "复位操作")
       .def("clone", &MoneyManagerBase::clone, "克隆操作")
 
-      .def("buy_notify", &MoneyManagerBase::buyNotify,
-           R"(buy_notify(self, trade_record)
+      .def("_buy_notify", &MoneyManagerBase::_buyNotify,
+           R"(_buy_notify(self, trade_record)
 
     【重载接口】交易系统发生实际买入操作时，通知交易变化情况，一般存在多次增减仓的情况才需要重载
 
     :param TradeRecord trade_record: 发生实际买入时的实际买入交易记录)")
 
-      .def("sell_notify", &MoneyManagerBase::sellNotify,
-           R"(sell_notify(self, trade_record)
+      .def("_sell_notify", &MoneyManagerBase::_sellNotify,
+           R"(_sell_notify(self, trade_record)
 
     【重载接口】交易系统发生实际卖出操作时，通知实际交易变化情况，一般存在多次增减仓的情况才需要重载
 
@@ -203,8 +206,16 @@ void export_MoneyManager(py::module& m) {
     m.def("MM_FixedCapital", MM_FixedCapital, py::arg("capital") = 10000.00,
           R"(MM_FixedCapital([capital = 10000.0])
 
-    固定资本资金管理策略
+    固定资金管理策略。买入数量 = 当前现金 / capital
 
+    :param float capital: 固定资本单位
+    :return: 资金管理策略实例)");
+
+    m.def("MM_FixedCapitalFunds", MM_FixedCapitalFunds, py::arg("capital") = 10000.00,
+          R"(MM_FixedCapitalFunds([capital = 10000.0]) 
+
+    固定资本管理策略。买入数量 = 当前总资产 / capital
+  
     :param float capital: 固定资本单位
     :return: 资金管理策略实例)");
 
@@ -224,7 +235,7 @@ void export_MoneyManager(py::module& m) {
 
     m.def("MM_FixedUnits", MM_FixedUnits, py::arg("n") = 33, R"(MM_FixedUnits([n = 33])
 
-    固定单位资金管理策略
+    固定单位资金管理策略。公式: 买入数量 = 当前现金 / n / 当前风险risk
 
     :param int n: n个资金单位
     :return: 资金管理策略实例)");
@@ -233,5 +244,18 @@ void export_MoneyManager(py::module& m) {
           py::arg("max_loss") = 1000.0,
           R"( MM_WilliamsFixedRisk([p=0.1, max_loss=1000.0])
 
-    威廉斯固定风险资金管理策略)");
+    威廉斯固定风险资金管理策略。买入数量 =（账户余额 × 风险百分比p）÷ 最大损失(max_loss)
+
+    :param float p: 风险百分比
+    :param float max_loss: 最大损失
+    :return: 资金管理策略实例)");
+
+    m.def("MM_FixedCountTps", MM_FixedCountTps, py::arg("buy_counts"), py::arg("sell_counts"),
+          R"(MM_FixedCountTps([buy_counts, sell_counts])
+          
+    连续买入/卖出固定数量资金管理策略。
+    
+    :param list buy_counts: 买入数量列表
+    :param list sell_counts: 卖出数量列表
+    :return: 资金管理策略实例)");
 }
