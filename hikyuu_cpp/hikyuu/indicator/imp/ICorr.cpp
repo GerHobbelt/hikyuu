@@ -5,9 +5,6 @@
  *      Author: fasiondog
  */
 
-#include "hikyuu/indicator/crt/ALIGN.h"
-#include "hikyuu/indicator/crt/CVAL.h"
-#include "hikyuu/indicator/crt/SLICE.h"
 #include "ICorr.h"
 
 #if HKU_SUPPORT_SERIALIZATION
@@ -16,15 +13,13 @@ BOOST_CLASS_EXPORT(hku::ICorr)
 
 namespace hku {
 
-ICorr::ICorr() : IndicatorImp("CORR") {
+ICorr::ICorr() : Indicator2InImp("CORR") {
     setParam<int>("n", 10);
-    setParam<bool>("fill_null", true);
 }
 
 ICorr::ICorr(const Indicator& ref_ind, int n, bool fill_null)
-: IndicatorImp("CORR"), m_ref_ind(ref_ind) {
+: Indicator2InImp("CORR", ref_ind, fill_null, 2) {
     setParam<int>("n", n);
-    setParam<bool>("fill_null", fill_null);
 }
 
 ICorr::~ICorr() {}
@@ -36,45 +31,30 @@ void ICorr::_checkParam(const string& name) const {
     }
 }
 
-IndicatorImpPtr ICorr::_clone() {
-    auto p = make_shared<ICorr>();
-    p->m_ref_ind = m_ref_ind.clone();
-    return p;
-}
-
 void ICorr::_calculate(const Indicator& ind) {
     size_t total = ind.size();
     HKU_IF_RETURN(total == 0, void());
 
-    _readyBuffer(total, 2);
-
-    auto k = getContext();
-    m_ref_ind.setContext(k);
-    Indicator ref = m_ref_ind;
-    auto dates = ref.getDatetimeList();
-    if (dates.empty()) {
-        if (ref.size() > ind.size()) {
-            ref = SLICE(ref, ref.size() - ind.size(), ref.size());
-        } else if (ref.size() < ind.size()) {
-            ref = CVAL(ind, 0.) + ref;
-        }
-    } else if (m_ref_ind.size() != ind.size()) {
-        ref = ALIGN(m_ref_ind, ind, getParam<bool>("fill_null"));
-    }
+    Indicator ref = prepare(ind);
 
     int n = getParam<int>("n");
     if (n == 0) {
         n = total;
     }
 
-    m_discard = std::max(ind.discard(), ref.discard());
-    size_t startPos = m_discard;
+    size_t startPos = std::max(ind.discard(), ref.discard());
+    m_discard = startPos + n - 1;
+    if (m_discard >= total) {
+        m_discard = total;
+        return;
+    }
+
     size_t first_end = startPos + n >= total ? total : startPos + n;
 
     auto const* datax = ind.data();
     auto const* datay = ref.data();
-    value_t kx = datax[m_discard];
-    value_t ky = datay[m_discard];
+    value_t kx = datax[startPos];
+    value_t ky = datay[startPos];
     value_t ex = 0.0, ey = 0.0, exy = 0.0, varx = 0.0, vary = 0.0, cov = 0.0;
     value_t ex2 = 0.0, ey2 = 0.0;
     value_t ix, iy;
@@ -86,19 +66,16 @@ void ICorr::_calculate(const Indicator& ind) {
         iy = datay[i] - ky;
         ex += ix;
         ey += iy;
-        value_t powx2 = ix * ix;
-        value_t powy2 = iy * iy;
-        value_t powxy = ix * iy;
-        exy += powxy;
-        ex2 += powx2;
-        ey2 += powy2;
-        size_t nobs = i - startPos;
-        varx = ex2 - powx2 / nobs;
-        vary = ey2 - powy2 / nobs;
-        cov = exy - powxy / nobs;
-        dst0[i] = cov / std::sqrt(varx * vary);
-        dst1[i] = cov / (nobs - 1);
+        ex2 += ix * ix;
+        ey2 += iy * iy;
+        exy += ix * iy;
     }
+
+    varx = ex2 - ex * ex / n;
+    vary = ey2 - ey * ey / n;
+    cov = exy - ex * ey / n;
+    dst0[first_end - 1] = cov / std::sqrt(varx * vary);
+    dst1[first_end - 1] = cov / (n - 1);
 
     for (size_t i = first_end; i < total; i++) {
         ix = datax[i] - kx;
@@ -116,9 +93,6 @@ void ICorr::_calculate(const Indicator& ind) {
         dst0[i] = cov / std::sqrt(varx * vary);
         dst1[i] = cov / (n - 1);
     }
-
-    // 修正 discard
-    m_discard = (m_discard + 2 < total) ? m_discard + 2 : total;
 }
 
 Indicator HKU_API CORR(const Indicator& ref_ind, int n, bool fill_null) {
