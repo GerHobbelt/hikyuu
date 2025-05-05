@@ -123,15 +123,16 @@ def start_build(verbose=False, mode='release', feedback=True, worker_num=2, low_
     if py_version != history_compile_info[
             'py_version'] or history_compile_info['mode'] != mode:
         clear_with_python_changed(mode)
-        kind = "shared" if mode == 'release' and sys.platform != 'darwin' else "static"
+        # kind = "shared" if mode == 'release' and sys.platform != 'darwin' else "static"
+        kind = "shared" if mode == 'release' else "static"
         cmd = "xmake f {} -c -y -m {} --feedback={} -k {} --low_precision={} --log_level={}".format(
             "-v -D" if verbose else "", mode, feedback, kind, low_precision,
             2 if mode == 'release' else 0)
 
         # macosx 下动态库不支持 serialize, 静态库太大不适合打包（hub中使用C++需要使用)
         # 静态库在 macosx 下支持 hub，也很麻烦，暂时搁置
-        # if sys.platform == 'darwin':
-        #     cmd += " --serialize=n"
+        if sys.platform == 'darwin':
+            cmd += " --serialize=n"
         print(cmd)
         os.system(cmd)
 
@@ -371,7 +372,7 @@ def wheel(feedback, j, low_precision, clear):
     elif current_plat == 'darwin' and cpu_arch != 'arm64' and current_bits == 64:
         plat = "macosx_x86_64"
     elif current_plat == 'darwin' and cpu_arch == 'arm64':
-        plat = "macosx_11_1_arm64"
+        plat = "macosx_11_0_arm64"
     else:
         print("*********尚未实现该平台的支持*******")
         return
