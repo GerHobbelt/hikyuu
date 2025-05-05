@@ -120,7 +120,7 @@ void Strategy::start(bool autoRecieveSpot) {
         agent.addProcess([this](const SpotRecord& spot) { _receivedSpot(spot); });
         agent.addPostProcess([this](Datetime revTime) {
             if (m_on_recieved_spot) {
-                event([this, revTime]() { m_on_recieved_spot(*this, revTime); });
+                event([this, revTime]() { m_on_recieved_spot(this, revTime); });
             }
         });
         startSpotAgent(true, getParam<int>("spot_worker_num"),
@@ -134,13 +134,12 @@ void Strategy::start(bool autoRecieveSpot) {
 }
 
 void Strategy::onChange(
-  std::function<void(const Strategy&, const Stock&, const SpotRecord& spot)>&& changeFunc) {
+  const std::function<void(Strategy*, const Stock&, const SpotRecord& spot)>& changeFunc) {
     HKU_CHECK(changeFunc, "Invalid changeFunc!");
     m_on_change = std::move(changeFunc);
 }
 
-void Strategy::onReceivedSpot(
-  std::function<void(const Strategy&, const Datetime&)>&& recievedFucn) {
+void Strategy::onReceivedSpot(const std::function<void(Strategy*, const Datetime&)>& recievedFucn) {
     HKU_CHECK(recievedFucn, "Invalid recievedFucn!");
     m_on_recieved_spot = std::move(recievedFucn);
 }
@@ -149,12 +148,12 @@ void Strategy::_receivedSpot(const SpotRecord& spot) {
     Stock stk = getStock(format("{}{}", spot.market, spot.code));
     if (!stk.isNull()) {
         if (m_on_change) {
-            event([this, stk, spot]() { m_on_change(*this, stk, spot); });
+            event([this, stk, spot]() { m_on_change(this, stk, spot); });
         }
     }
 }
 
-void Strategy::runDaily(std::function<void(const Strategy&)>&& func, const TimeDelta& delta,
+void Strategy::runDaily(const std::function<void(Strategy*)>& func, const TimeDelta& delta,
                         const std::string& market, bool ignoreMarket) {
     HKU_CHECK(func, "Invalid func!");
     HKU_CHECK(!market.empty(), "The market can not be empty!");
@@ -166,7 +165,7 @@ void Strategy::runDaily(std::function<void(const Strategy&)>&& func, const TimeD
     run_at.ignoreMarket = ignoreMarket;
 
     if (ignoreMarket) {
-        run_at.func = [this, f = std::move(func)]() { event([this, f]() { f(*this); }); };
+        run_at.func = [this, f = std::move(func)]() { event([this, f]() { f(this); }); };
 
     } else {
         run_at.func = [this, market = run_at.market, f = std::move(func)]() {
@@ -184,7 +183,7 @@ void Strategy::runDaily(std::function<void(const Strategy&)>&& func, const TimeD
             Datetime close2 = today + market_info.closeTime2();
             Datetime now = Datetime::now();
             if ((now >= open1 && now <= close1) || (now >= open2 && now <= close2)) {
-                event([this, f]() { f(*this); });
+                event([this, f]() { f(this); });
             }
         };
     }
@@ -200,87 +199,89 @@ void Strategy::_runDaily() {
     for (auto& run_at : m_run_daily_at_list) {
         if (run_at.ignoreMarket) {
             scheduler->addDurationFunc(std::numeric_limits<int>::max(), run_at.delta, run_at.func);
-            return;
-        }
 
-        try {
-            const auto& sm = StockManager::instance();
-            auto market_info = sm.getMarketInfo(run_at.market);
-            HKU_ERROR_IF_RETURN(market_info == Null<MarketInfo>(), void(),
-                                "market {} not found! The run daily func is discard!",
-                                run_at.market);
+        } else {
+            try {
+                const auto& sm = StockManager::instance();
+                auto market_info = sm.getMarketInfo(run_at.market);
+                HKU_ERROR_IF_RETURN(market_info == Null<MarketInfo>(), void(),
+                                    "market {} not found! The run daily func is discard!",
+                                    run_at.market);
 
-            auto today = Datetime::today();
-            auto now = Datetime::now();
-            TimeDelta now_time = now - today;
-            if (now_time >= market_info.closeTime2()) {
-                scheduler->addFuncAtTime(today.nextDay() + market_info.openTime1(), [&run_at]() {
-                    run_at.func();
-                    auto* sched = getScheduler();
-                    sched->addDurationFunc(std::numeric_limits<int>::max(), run_at.delta,
-                                           run_at.func);
-                });
+                auto today = Datetime::today();
+                auto now = Datetime::now();
+                TimeDelta now_time = now - today;
+                if (now_time >= market_info.closeTime2()) {
+                    scheduler->addFuncAtTime(
+                      today.nextDay() + market_info.openTime1(), [&run_at]() {
+                          run_at.func();
+                          auto* sched = getScheduler();
+                          sched->addDurationFunc(std::numeric_limits<int>::max(), run_at.delta,
+                                                 run_at.func);
+                      });
 
-            } else if (now_time >= market_info.openTime2()) {
-                int64_t ticks = now_time.ticks() - market_info.openTime2().ticks();
-                int64_t delta_ticks = run_at.delta.ticks();
-                if (ticks % delta_ticks == 0) {
-                    scheduler->addDurationFunc(std::numeric_limits<int>::max(), run_at.delta,
-                                               run_at.func);
-                } else {
-                    auto delay =
-                      TimeDelta::fromTicks((ticks / delta_ticks + 1) * delta_ticks - ticks);
-                    scheduler->addFuncAtTime(now + delay, [&run_at]() {
+                } else if (now_time >= market_info.openTime2()) {
+                    int64_t ticks = now_time.ticks() - market_info.openTime2().ticks();
+                    int64_t delta_ticks = run_at.delta.ticks();
+                    if (ticks % delta_ticks == 0) {
+                        scheduler->addDurationFunc(std::numeric_limits<int>::max(), run_at.delta,
+                                                   run_at.func);
+                    } else {
+                        auto delay =
+                          TimeDelta::fromTicks((ticks / delta_ticks + 1) * delta_ticks - ticks);
+                        scheduler->addFuncAtTime(now + delay, [&run_at]() {
+                            run_at.func();
+                            auto* sched = getScheduler();
+                            sched->addDurationFunc(std::numeric_limits<int>::max(), run_at.delta,
+                                                   run_at.func);
+                        });
+                    }
+
+                } else if (now_time >= market_info.closeTime1()) {
+                    scheduler->addFuncAtTime(today + market_info.openTime2(), [&run_at]() {
                         run_at.func();
                         auto* sched = getScheduler();
                         sched->addDurationFunc(std::numeric_limits<int>::max(), run_at.delta,
                                                run_at.func);
                     });
-                }
 
-            } else if (now_time >= market_info.closeTime1()) {
-                scheduler->addFuncAtTime(today + market_info.openTime2(), [&run_at]() {
-                    run_at.func();
-                    auto* sched = getScheduler();
-                    sched->addDurationFunc(std::numeric_limits<int>::max(), run_at.delta,
-                                           run_at.func);
-                });
+                } else if (now_time < market_info.closeTime1() &&
+                           now_time >= market_info.openTime1()) {
+                    int64_t ticks = now_time.ticks() - market_info.openTime1().ticks();
+                    int64_t delta_ticks = run_at.delta.ticks();
+                    if (ticks % delta_ticks == 0) {
+                        scheduler->addDurationFunc(std::numeric_limits<int>::max(), run_at.delta,
+                                                   run_at.func);
+                    } else {
+                        auto delay =
+                          TimeDelta::fromTicks((ticks / delta_ticks + 1) * delta_ticks - ticks);
+                        scheduler->addFuncAtTime(now + delay, [&run_at]() {
+                            run_at.func();
+                            auto* sched = getScheduler();
+                            sched->addDurationFunc(std::numeric_limits<int>::max(), run_at.delta,
+                                                   run_at.func);
+                        });
+                    }
 
-            } else if (now_time < market_info.closeTime1() && now_time >= market_info.openTime1()) {
-                int64_t ticks = now_time.ticks() - market_info.openTime1().ticks();
-                int64_t delta_ticks = run_at.delta.ticks();
-                if (ticks % delta_ticks == 0) {
-                    scheduler->addDurationFunc(std::numeric_limits<int>::max(), run_at.delta,
-                                               run_at.func);
-                } else {
-                    auto delay =
-                      TimeDelta::fromTicks((ticks / delta_ticks + 1) * delta_ticks - ticks);
-                    scheduler->addFuncAtTime(now + delay, [&run_at]() {
+                } else if (now_time < market_info.openTime1()) {
+                    scheduler->addFuncAtTime(today + market_info.openTime1(), [&run_at]() {
                         run_at.func();
                         auto* sched = getScheduler();
                         sched->addDurationFunc(std::numeric_limits<int>::max(), run_at.delta,
                                                run_at.func);
                     });
+
+                } else {
+                    CLS_ERROR("Unknown process! now_time: {}", now_time);
                 }
-
-            } else if (now_time < market_info.openTime1()) {
-                scheduler->addFuncAtTime(today + market_info.openTime1(), [&run_at]() {
-                    run_at.func();
-                    auto* sched = getScheduler();
-                    sched->addDurationFunc(std::numeric_limits<int>::max(), run_at.delta,
-                                           run_at.func);
-                });
-
-            } else {
-                CLS_ERROR("Unknown process! now_time: {}", now_time);
+            } catch (const std::exception& e) {
+                CLS_THROW("{}", e.what());
             }
-        } catch (const std::exception& e) {
-            CLS_THROW("{}", e.what());
         }
     }
 }
 
-void Strategy::runDailyAt(std::function<void(const Strategy&)>&& func, const TimeDelta& delta,
+void Strategy::runDailyAt(const std::function<void(Strategy*)>& func, const TimeDelta& delta,
                           bool ignoreHoliday) {
     HKU_CHECK(func, "Invalid func!");
     HKU_CHECK(delta < Days(1), "TimeDelta must < Days(1)!");
@@ -294,12 +295,12 @@ void Strategy::runDailyAt(std::function<void(const Strategy&)>&& func, const Tim
             auto today = Datetime::today();
             int day = today.dayOfWeek();
             if (day != 0 && day != 6 && !sm.isHoliday(today)) {
-                event([this, f]() { f(*this); });
+                event([this, f]() { f(this); });
             }
         };
 
     } else {
-        new_func = [this, f = std::move(func)]() { event([this, f]() { f(*this); }); };
+        new_func = [this, f = std::move(func)]() { event([this, f]() { f(this); }); };
     }
 
     m_run_daily_at_funcs[delta] = new_func;

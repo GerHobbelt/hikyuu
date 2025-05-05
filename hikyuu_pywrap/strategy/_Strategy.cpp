@@ -13,16 +13,10 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/eval.h>
+#include "../pybind_utils.h"
 
 namespace py = pybind11;
 using namespace hku;
-
-static bool check_pyfunction_arg_num(py::object& func, size_t arg_num) {
-    py::module_ inspect = py::module_::import("inspect");
-    py::object sig = inspect.attr("signature")(func);
-    py::object params = sig.attr("parameters");
-    return len(params) == arg_num;
-}
 
 void export_Strategy(py::module& m) {
     Datetime null_date;
@@ -64,13 +58,15 @@ void export_Strategy(py::module& m) {
             // python 中在 start 之前，强制加入一个空函数，用于捕获 KeyboardInterrupt 来终止策略
             py::object func = py::eval("lambda stg: None");
             HKU_CHECK(check_pyfunction_arg_num(func, 1), "Number of parameters does not match!");
-            auto new_func = [=](const Strategy& stg) {
+            auto new_func = [=](Strategy* stg) {
                 try {
                     func(stg);
                 } catch (py::error_already_set& e) {
                     if (e.matches(PyExc_KeyboardInterrupt)) {
                         printf("KeyboardInterrupt\n");
                         raise(SIGTERM);
+                    } else {
+                        HKU_ERROR(e.what());
                     }
                 } catch (...) {
                     // do nothing
@@ -92,13 +88,15 @@ void export_Strategy(py::module& m) {
             HKU_CHECK(py::hasattr(func, "__call__"), "func is not callable!");
             HKU_CHECK(check_pyfunction_arg_num(func, 3), "Number of parameters does not match!");
             py::object c_func = func.attr("__call__");
-            auto new_func = [=](const Strategy& stg, const Stock& stk, const SpotRecord& spot) {
+            auto new_func = [=](Strategy* stg, const Stock& stk, const SpotRecord& spot) {
                 try {
                     c_func(stg, stk, spot);
                 } catch (py::error_already_set& e) {
                     if (e.matches(PyExc_KeyboardInterrupt)) {
                         printf("KeyboardInterrupt\n");
                         raise(SIGTERM);
+                    } else {
+                        HKU_ERROR(e.what());
                     }
                 } catch (const std::exception& e) {
                     HKU_ERROR(e.what());
@@ -120,13 +118,15 @@ void export_Strategy(py::module& m) {
             HKU_CHECK(py::hasattr(func, "__call__"), "func is not callable!");
             HKU_CHECK(check_pyfunction_arg_num(func, 2), "Number of parameters does not match!");
             py::object c_func = func.attr("__call__");
-            auto new_func = [=](const Strategy& stg, Datetime revTime) {
+            auto new_func = [=](Strategy* stg, Datetime revTime) {
                 try {
                     c_func(stg, revTime);
                 } catch (py::error_already_set& e) {
                     if (e.matches(PyExc_KeyboardInterrupt)) {
                         printf("KeyboardInterrupt\n");
                         raise(SIGTERM);
+                    } else {
+                        HKU_ERROR(e.what());
                     }
                 } catch (const std::exception& e) {
                     HKU_ERROR(e.what());
@@ -149,13 +149,15 @@ void export_Strategy(py::module& m) {
             HKU_CHECK(py::hasattr(func, "__call__"), "func is not callable!");
             HKU_CHECK(check_pyfunction_arg_num(func, 1), "Number of parameters does not match!");
             py::object c_func = func.attr("__call__");
-            auto new_func = [=](const Strategy& stg) {
+            auto new_func = [=](Strategy* stg) {
                 try {
                     c_func(stg);
                 } catch (py::error_already_set& e) {
                     if (e.matches(PyExc_KeyboardInterrupt)) {
                         printf("KeyboardInterrupt\n");
                         raise(SIGTERM);
+                    } else {
+                        HKU_ERROR(e.what());
                     }
                 } catch (const std::exception& e) {
                     HKU_ERROR(e.what());
@@ -182,13 +184,15 @@ void export_Strategy(py::module& m) {
             HKU_CHECK(py::hasattr(func, "__call__"), "func is not callable!");
             HKU_CHECK(check_pyfunction_arg_num(func, 1), "Number of parameters does not match!");
             py::object c_func = func.attr("__call__");
-            auto new_func = [=](const Strategy& stg) {
+            auto new_func = [=](Strategy* stg) {
                 try {
                     c_func(stg);
                 } catch (py::error_already_set& e) {
                     if (e.matches(PyExc_KeyboardInterrupt)) {
                         printf("KeyboardInterrupt\n");
                         raise(SIGTERM);
+                    } else {
+                        HKU_ERROR(e.what());
                     }
                 } catch (const std::exception& e) {
                     HKU_ERROR(e.what());
