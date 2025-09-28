@@ -48,6 +48,12 @@ from hikyuu.data.common_mysql import create_database as mysql_create_database
 from hikyuu.data.common_mysql import import_new_holidays as mysql_import_new_holidays
 from hikyuu.data.pytdx_to_mysql import import_index_name as mysql_import_index_name
 from hikyuu.data.pytdx_to_mysql import import_stock_name as mysql_import_stock_name
+
+from hikyuu.data.common_clickhouse import create_database as clickhouse_create_database
+from hikyuu.data.common_clickhouse import import_new_holidays as clickhouse_import_new_holidays
+from hikyuu.data.pytdx_to_clickhouse import import_index_name as clickhouse_import_index_name
+from hikyuu.data.pytdx_to_clickhouse import import_stock_name as clickhouse_import_stock_name
+
 from hikyuu.util.mylog import class_logger
 
 
@@ -140,6 +146,32 @@ class UsePytdxImportToH5Thread(QThread):
         cur_host = 0
 
         # 以下按数据量从大到小依次使用速度从高到低的TDX服务器
+        if self.config.getboolean('ktype', 'min5', fallback=False):
+            start_date = datetime.datetime.strptime(
+                config['ktype']['min5_start_date'], '%Y-%m-%d').date()
+            for market in g_market_list:
+                self.tasks.append(
+                    ImportPytdxToH5(
+                        self.log_queue, self.queue, self.config, market,
+                        '5MIN', self.quotations, use_hosts[cur_host][0],
+                        use_hosts[cur_host][1], dest_dir,
+                        start_date.year * 100000000 +
+                        start_date.month * 1000000 + start_date.day * 10000))
+                cur_host += 1
+
+        if self.config.getboolean('ktype', 'day', fallback=False):
+            start_date = datetime.datetime.strptime(
+                config['ktype']['day_start_date'], '%Y-%m-%d').date()
+            for market in g_market_list:
+                self.tasks.append(
+                    ImportPytdxToH5(
+                        self.log_queue, self.queue, self.config, market, 'DAY',
+                        self.quotations, use_hosts[cur_host][0],
+                        use_hosts[cur_host][1], dest_dir,
+                        start_date.year * 100000000 +
+                        start_date.month * 1000000 + start_date.day * 10000))
+                cur_host += 1
+
         if self.config.getboolean('ktype', 'trans', fallback=False):
             today = datetime.date.today()
             trans_start_date = datetime.datetime.strptime(
@@ -180,32 +212,6 @@ class UsePytdxImportToH5Thread(QThread):
                                         use_hosts[cur_host][0],
                                         use_hosts[cur_host][1], dest_dir,
                                         time_max_days))
-                cur_host += 1
-
-        if self.config.getboolean('ktype', 'min5', fallback=False):
-            start_date = datetime.datetime.strptime(
-                config['ktype']['min5_start_date'], '%Y-%m-%d').date()
-            for market in g_market_list:
-                self.tasks.append(
-                    ImportPytdxToH5(
-                        self.log_queue, self.queue, self.config, market,
-                        '5MIN', self.quotations, use_hosts[cur_host][0],
-                        use_hosts[cur_host][1], dest_dir,
-                        start_date.year * 100000000 +
-                        start_date.month * 1000000 + start_date.day * 10000))
-                cur_host += 1
-
-        if self.config.getboolean('ktype', 'day', fallback=False):
-            start_date = datetime.datetime.strptime(
-                config['ktype']['day_start_date'], '%Y-%m-%d').date()
-            for market in g_market_list:
-                self.tasks.append(
-                    ImportPytdxToH5(
-                        self.log_queue, self.queue, self.config, market, 'DAY',
-                        self.quotations, use_hosts[cur_host][0],
-                        use_hosts[cur_host][1], dest_dir,
-                        start_date.year * 100000000 +
-                        start_date.month * 1000000 + start_date.day * 10000))
                 cur_host += 1
 
         if self.config.getboolean('weight', 'enable', fallback=False):
@@ -265,6 +271,19 @@ class UsePytdxImportToH5Thread(QThread):
             import_new_holidays = mysql_import_new_holidays
             import_index_name = mysql_import_index_name
             import_stock_name = mysql_import_stock_name
+        elif self.config.getboolean('clickhouse', 'enable', fallback=True):
+            db_config = {
+                'username': self.config['clickhouse']['usr'],
+                'password': self.config['clickhouse']['pwd'],
+                'host': self.config['clickhouse']['host'],
+                'port': self.config['clickhouse']['http_port']
+            }
+            import clickhouse_connect
+            connect = clickhouse_connect.get_client(**db_config)
+            create_database = clickhouse_create_database
+            import_new_holidays = clickhouse_import_new_holidays
+            import_index_name = clickhouse_import_index_name
+            import_stock_name = clickhouse_import_stock_name
 
         create_database(connect)
 
