@@ -37,6 +37,7 @@ option("low_precision", {description = "Enable low precision.", default = false}
 option("log_level", {description = "set log level.", default = 2, values = {1, 2, 3, 4, 5, 6}})
 option("async_log", {description = "Use async log.", default = false})
 option("leak_check", {description = "Enable leak check for test", default = false})
+option("arrow", {description = "Enable arrow support.", default = true})
 
 -- 使用 serialize 时，建议使用静态库方式编译，boost serializasion 对 dll 的方式支持不好
 -- windows下如果使用 serialize 且希望使用动态库，需要设置 runtimes 参数为 "MD"
@@ -96,6 +97,7 @@ set_configvar("HKU_ENABLE_TDX_KDATA", get_config("tdx") and 1 or 0)
 
 set_configvar("HKU_USE_LOW_PRECISION", get_config("low_precision") and 1 or 0)
 set_configvar("HKU_ENABLE_TA_LIB", get_config("ta_lib") and 1 or 0)
+set_configvar("HKU_ENABLE_ARROW", get_config("arrow") and 1 or 0)
 
 set_configvar("HKU_SUPPORT_DATETIME", 1)
 set_configvar("HKU_ENABLE_SQLCIPHER", 0)
@@ -110,16 +112,11 @@ set_configvar("HKU_ENABLE_HTTP_CLIENT_SSL", get_config("http_client_ssl") and 1 
 set_configvar("HKU_ENABLE_HTTP_CLIENT_ZIP", get_config("http_client_zip") and 1 or 0)
 set_configvar("HKU_ENABLE_NODE", 1)
 
-local boost_version = "1.88.0"
 local hdf5_version = "1.12.2"
 if is_plat("windows") then
     hdf5_version = "1.13.3"
 end
-local fmt_version = "11.1.4"
-local spdlog_version = "1.15.2"
 local flatbuffers_version = "25.2.10"
-local nng_version = "1.10.1"
-local sqlite_version = "3.49.0+100"
 local mysql_version = "8.0.31"
 if is_plat("windows") or (is_plat("linux", "cross") and is_arch("aarch64", "arm64.*")) then 
     mysql_version = "8.0.21" 
@@ -136,7 +133,7 @@ add_repositories("hikyuu-repo https://github.com/fasiondog/hikyuu_extern_libs.gi
      add_requires("mysql " .. mysql_version, { system = false })
  end
 
-add_requires("boost " .. boost_version, {
+add_requires("boost", {
   debug = is_mode("debug"),
   configs = {
     shared = is_plat("windows"),
@@ -151,16 +148,16 @@ add_requires("boost " .. boost_version, {
   },
 })
 
-add_requires("fmt " .. fmt_version, {system = false, configs = {header_only = true}})
-add_requires("spdlog " .. spdlog_version, {system = false, configs = {header_only = true, fmt_external = true}})
-add_requireconfs("spdlog.fmt", {override = true, version=fmt_version, system = false, configs = {header_only = true}})
-add_requires("sqlite3 " .. sqlite_version, {configs = {shared = true, safe_mode="2", cxflags = "-fPIC"}})
+add_requires("fmt", {system = false, configs = {header_only = true}})
+add_requires("spdlog", {system = false, configs = {header_only = true, fmt_external = true}})
+add_requireconfs("spdlog.fmt", {override = true, system = false, configs = {header_only = true}})
+add_requires("sqlite3", {system = false, configs = {shared = true, safe_mode="2", cxflags = "-fPIC"}})
 add_requires("flatbuffers v" .. flatbuffers_version, {system = false, configs= {runtimes = get_config("runtimes")}})
-add_requires("nng " .. nng_version, {system = false, configs = {NNG_ENABLE_TLS = has_config("http_client_ssl"), cxflags = "-fPIC"}})
+add_requires("nng", {system = false, configs = {NNG_ENABLE_TLS = has_config("http_client_ssl"), cxflags = "-fPIC"}})
 add_requires("nlohmann_json", {system = false})
 add_requires("xxhash", {system = false})
 add_requires("utf8proc", {system = false})
-if get_config("leak_check") then
+if get_config("leak_check") and get_config("arrow") then
     add_requires("arrow", {system = false, configs = {shared = true}})
 else
     add_requires("arrow", {system = false})

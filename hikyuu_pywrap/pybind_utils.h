@@ -9,12 +9,15 @@
 #ifndef HIKYUU_PYTHON_BIND_UTILS_H
 #define HIKYUU_PYTHON_BIND_UTILS_H
 
+#include <hikyuu/config.h>
+#if HKU_ENABLE_ARROW
+#include <arrow/api.h>
+#endif
 #include <pybind11/pybind11.h>
 
 #include <pybind11/operators.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
-#include <arrow/api.h>
 #include <vector>
 #include <string>
 #include "convert_any.h"
@@ -107,8 +110,8 @@ protected:                                                                      
         return true;                                                             \
     }
 
-// 用于检查已 py::object 方式传递的函数参数个数是否符合预期
-inline bool check_pyfunction_arg_num(py::object& func, size_t arg_num) {
+// 用于检查以 py::object 方式传递的函数参数个数是否符合预期
+inline bool check_pyfunction_arg_num(const py::object& func, size_t arg_num) {
     py::module_ inspect = py::module_::import("inspect");
     py::object sig = inspect.attr("signature")(func);
     py::object params = sig.attr("parameters");
@@ -124,12 +127,14 @@ inline bool check_pyfunction_arg_num(py::object& func, size_t arg_num) {
  */
 size_t utf8_to_utf32(const std::string& utf8_str, int32_t* out, size_t out_len) noexcept;
 
+#if HKU_ENABLE_ARROW
 /*
  * 将arrow::Table转换为 pyarrow::Table
  * @param table 待转换的arrow::Table
  * @return 转换后的py::object
  */
 py::object to_pyarrow_table(const std::shared_ptr<arrow::Table>& table);
+#endif
 
 }  // namespace hku
 
