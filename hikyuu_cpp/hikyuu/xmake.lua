@@ -106,15 +106,18 @@ target("hikyuu")
     if get_config("mysql") then
         add_files("./utilities/db_connect/mysql/**.cpp")
     end
-    if has_config("mo") then
-        add_files("./utilities/mo/**.cpp")
-    end
+    if get_config("mo") then
+        if is_plat("macosx") then
+            add_frameworks("CoreFoundation")
+        end
+        add_files("./utilities/mo/*.cpp")
+    end    
     if has_config("ta_lib") then
         add_files("./indicator_talib/**.cpp")
     end
 
     after_build(function(target)
-        local destpath = get_config("buildir") .. "/" .. get_config("mode") .. "/" .. get_config("plat") .. "/" .. get_config("arch")
+        local destpath = get_config("builddir") .. "/" .. get_config("mode") .. "/" .. get_config("plat") .. "/" .. get_config("arch")
         print(destpath)
         import("core.project.task")
         task.run("copy_dependents", {}, target, destpath, true)
