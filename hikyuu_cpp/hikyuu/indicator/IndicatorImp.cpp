@@ -1450,6 +1450,9 @@ void IndicatorImp::execute_if() {
     if (discard < maxp->discard()) {
         discard = maxp->discard();
     }
+    if (discard < m_three->discard()) {
+        discard = m_three->discard();
+    }
 
     if (m_three->size() >= maxp->size()) {
         total = m_three->size();
@@ -1483,7 +1486,8 @@ void IndicatorImp::execute_if() {
 void IndicatorImp::_dyn_calculate(const Indicator &ind) {
     // SPEND_TIME(IndicatorImp__dyn_calculate);
     const auto &ind_param = getIndParamImp("n");
-    HKU_CHECK(ind_param->size() == ind.size(), "ind_param->size()={}, ind.size()={}!",
+    // CVAL或PRICELIST可能会大于ind.size()
+    HKU_CHECK(ind_param->size() >= ind.size(), "ind_param->size()={}, ind.size()={}!",
               ind_param->size(), ind.size());
     m_discard = std::max(ind.discard(), ind_param->discard());
     size_t total = ind.size();

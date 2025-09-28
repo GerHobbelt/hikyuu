@@ -446,10 +446,6 @@ void System::clearDelayBuyRequest() {
     m_buyRequest.clear();
 }
 
-bool System::haveDelaySellRequest() const {
-    return m_sellRequest.valid;
-}
-
 TradeRecord System::runMoment(const Datetime& datetime) {
     size_t pos = m_kdata.getPos(datetime);
     HKU_IF_RETURN(pos == Null<size_t>(), TradeRecord());
@@ -1241,6 +1237,15 @@ TradeRecord System::pfProcessDelaySellRequest(const Datetime& date) {
     KRecord today = m_kdata.getKRecord(pos);
     KRecord src_today = m_src_kdata.getKRecord(pos);
     return _sellDelay(today, src_today);
+}
+
+TradeRecord System::pfProcessDelayBuyRequest(const Datetime& date) {
+    HKU_IF_RETURN(!m_buyRequest.valid, TradeRecord());
+    size_t pos = m_kdata.getPos(date);
+    HKU_IF_RETURN(pos == Null<size_t>(), TradeRecord());
+    KRecord today = m_kdata.getKRecord(pos);
+    KRecord src_today = m_src_kdata.getKRecord(pos);
+    return _buyDelay(today, src_today);
 }
 
 price_t System::_getStoplossPrice(const KRecord& today, const KRecord& src_today, price_t price) {
