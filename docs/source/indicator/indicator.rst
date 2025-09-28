@@ -39,6 +39,66 @@
     :param bool ignore_context: 是否忽略上下文。忽略时，强制使用 query, market, stk_type 参数。
     :rtype: Indicator
 
+.. py:function:: AGG_COUNT
+
+    聚合函数: 非空值计数, 可参考 :func:`AGG_STD`   
+
+.. py:function:: AGG_MAD
+
+    聚合函数: 平均绝对偏差, 可参考 :func:`AGG_STD`
+
+.. py:function:: AGG_MAX
+
+    聚合函数: 最大值, 可参考 :func:`AGG_STD`
+
+.. py:function:: AGG_MEAN
+
+    聚合函数: 平均值, 可参考 :func:`AGG_STD`
+
+.. py:function:: AGG_MEDIAN
+
+    聚合函数: 中位数, 可参考 :func:`AGG_STD`    
+
+.. py:function:: AGG_MIN
+
+    聚合函数: 最小值, 可参考 :func:`AGG_STD`
+
+.. py:function:: AGG_PROD
+
+    聚合函数: 乘积, 可参考 :func:`AGG_STD` 
+
+.. py:function:: AGG_QUANTILE(ind[, ktype=Query.MIN, fill_null=False, unit=1, quantile=0.75])
+
+    聚合其他K线周期分位数, 可参考 AGG_STD 帮助
+
+    :param Indicator ind: 指标数据
+    :param KQuery.KType ktype: 聚合的K线周期
+    :param bool fill_null: 是否填充缺失值
+    :param int unit: 聚合周期单位 (上下文K线分组单位, 使用日线计算分钟线聚合时, unit=2代表聚合2天的分钟线)
+    :param float quantile: 分位数 (0, 1) 之间
+    :return: 指标数据
+    :rtype: Indicator     
+
+.. py:function:: AGG_STD(ind[, ktype=Query.MIN, fill_null=False, unit=1, ddof=1])
+
+    聚合其他K线周期的标准差, 如计算日线时聚合分钟线收盘价的标准差
+
+        >>> kdata = get_kdata('sh600000', Query(Datetime(20250101), ktype=Query.DAY))
+        >>> ind = AGG_STD(CLOSE(), ktype=Query.MIN, fill_null=False, unit=1, ddof=1)
+        >>> ind(k)
+
+    :param Indicator ind: 指标数据
+    :param KQuery.KType ktype: 聚合的K线周期
+    :param bool fill_null: 是否填充缺失值
+    :param int unit: 聚合周期单位 (滚动聚合单位, 使用日线计算分钟线聚合时, unit=2代表聚合2天的分钟线)
+    :param int ddof: 自由度(1: 样本标准差, 0: 总体标准差)
+    :return: 指标数据
+    :rtype: Indicator
+
+.. py:function:: AGG_VAR
+
+    聚合函数: 方差, 可参考 :func:`AGG_STD`
+
 
 .. py:function:: ALIGN(data, ref[, fill_null=True])
 
@@ -982,6 +1042,16 @@
     :rtype: Indicator
 
 
+.. py:function:: REFX(n: int)
+
+    REF增强(勿用于回测), 用于获取指标中第n个周期的值, n为正数时从当前周期向前数, 为负数时从当前周期向后数。
+
+    注意：此函数属于未来函数, 不应被用于回测, 主要用于AI等需要获取未来数据的场景。
+
+    :param Indicator ind: 指标
+    :param int n: 周期数    
+
+
 .. py:function:: RECOVER_BACKWARD([data])
 
     对输入的指标数据 (CLOSE|OPEN|HIGH|LOW) 进行后向复权
@@ -1145,14 +1215,14 @@
     :rtype: Indicator
 
 
-.. py:function:: SLICE(data, start, end, result_index=0)
+.. py:function:: SLICE(data, start, end, result_index=-1)
 
     获取某指标中指定范围 [start, end) 的数据，生成新的指标
 
     :param Indicator|sequence data: 输入数据
     :param int start: 起始位置
     :param int end: 终止位置（不包含本身）
-    :param int result_index: 原输入数据中的结果集
+    :param int result_index: 原输入数据中的结果集, 默认小于0时表示全部结果集
 
 
 .. py:function:: SLOPE(data, n=22)

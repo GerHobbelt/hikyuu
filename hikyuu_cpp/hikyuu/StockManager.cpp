@@ -110,6 +110,7 @@ void StockManager::init(const Parameter& baseInfoParam, const Parameter& blockPa
         m_plugin_manager.pluginPath(m_hikyuuParam.tryGet<string>(
           "plugindir", fmt::format("{}/.hikyuu/plugin", getUserDir())));
     }
+    HKU_INFO("Plugin path: {}", getPluginPath());
 
     // 注册扩展K线处理
     registerPredefinedExtraKType();
@@ -188,7 +189,8 @@ void StockManager::loadData() {
     loadAllKData();
 
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start_time;
-    HKU_INFO(htr("{:<.2f}s Loaded Data."), sec.count());
+    auto seconds = sec.count();
+    HKU_INFO(htr("{:<.2f}s Loaded Data.", seconds));
 }
 
 void StockManager::loadAllKData() {
@@ -224,9 +226,9 @@ void StockManager::loadAllKData() {
             m_preloadParam.set<int>(preload_key, context_iter->second);
         }
 
+        int preload_max_num = m_preloadParam.tryGet<int>(preload_key, 0);
         HKU_INFO_IF(m_preloadParam.tryGet<bool>(back, false),
-                    htr("Preloading {} kdata to buffer (max: {})!"), back,
-                    m_preloadParam.tryGet<int>(preload_key, 0));
+                    htr("Preloading {} kdata to buffer (max: {})!", back, preload_max_num));
     }
 
     // 先加载同类K线
@@ -442,7 +444,7 @@ bool StockManager::isTradingHours(const Datetime& d, const string& market) const
     HKU_IF_RETURN(isHoliday(d), false);
     auto hour = d - d.startOfDay();
     MarketInfo marketinfo = getMarketInfo(market);
-    HKU_CHECK(marketinfo != Null<MarketInfo>(), htr("Not found market info: {}!"), market);
+    HKU_CHECK(marketinfo != Null<MarketInfo>(), "{}: {}!", htr("Not found market info"), market);
     HKU_IF_RETURN((hour >= marketinfo.openTime1() && hour <= marketinfo.closeTime1()) ||
                     (hour >= marketinfo.openTime2() && hour <= marketinfo.closeTime2()),
                   true);

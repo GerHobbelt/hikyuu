@@ -20,6 +20,8 @@
 * :py:func:`JUMPUP` - 边缘跳变，从大于0.0，跳变到 <= 0.0
 * :py:func:`LASTVALUE` - 等同于通达信 CONST 指标。取输入指标最后值为常数, 即结果中所有值均为输入指标的最后值, 谨慎使用。含未来函数, 谨慎使用。
 * :py:func:`PRICELIST` - 将PriceList或Indicator的结果集包装为Indicator，同名 VALUE
+* :py:func:`REF` - 向前引用 （即右移），引用若干周期前的数据
+* :py:func:`REFX` - REF增强, 可左移或右移。左移时为未来函数，勿用于回测。
 * :py:func:`REPLACE` - 替换指标中指定值，默认为替换 nan 值为 0.0
 * :py:func:`RESULT` - 以指标公式的方式返回指定指标中相应的结果集
 * :py:func:`SLICE` - 获取某指标中指定范围 [start, end) 的数据，生成新的指标
@@ -113,7 +115,6 @@
 
 * :py:func:`AVEDEV` - 平均绝对偏差
 * :py:func:`DEVSQ` - 数据偏差平方和
-* :py:func:`RANK` - [VIP]计算指标值在指定板块中的排名
 * :py:func:`STD` - 估算标准差，同 STDEV
 * :py:func:`STDEV` - 计算N周期内样本标准差
 * :py:func:`STDP` - 总体标准差
@@ -126,7 +127,7 @@
 
 * :py:func:`BLOCKSETNUM` - 返回板块股个数
 * :py:func:`INSUM` - 返回板块各成分该指标相应输出按计算类型得到的计算值.计算类型:0-累加,1-平均数,2-最大值,3-最小值,4-排名(1对应指标值最低), 5-排名(从1开始对应指标值最高).
-
+* :py:func:`RANK` - [VIP]计算指标值在指定板块中的排名
 
 **技术指标**
 
@@ -152,7 +153,6 @@
 * :py:func:`MACD` - 平滑异同移动平均线
 * :py:func:`AMA` - 佩里.J 考夫曼（Perry J.Kaufman）自适应移动平均 [BOOK1]_
 * :py:func:`EMA` - 指数移动平均线(Exponential Moving Average)
-* :py:func:`REF` - 向前引用 （即右移），引用若干周期前的数据
 * :py:func:`ROC` - 变动率指标: ((price / prevPrice)-1)*100
 * :py:func:`ROCP` - 变动率指标: (price - prevPrice) / prevPrice
 * :py:func:`ROCR` - 变动率指标: (price / prevPrice)
@@ -164,6 +164,21 @@
 * :py:func:`SUMBARS` - 累加到指定周期数, 向前累加到指定值到现在的周期数
 * :py:func:`TR` - 真实波动幅度
 * :py:func:`VIGOR` - 亚历山大.艾尔德力度指数
+
+
+**聚合指标**
+
+* :py:func:`AGG_COUNT` - [VIP]聚合函数: 非空值计数
+* :py:func:`AGG_MAD` - [VIP]聚合函数: 平均绝对偏差
+* :py:func:`AGG_MAX` - [VIP]聚合函数: 最大值
+* :py:func:`AGG_MIN` - [VIP]聚合函数: 最大值
+* :py:func:`AGG_MEAN` - [VIP]聚合函数: 平均值
+* :py:func:`AGG_MEDIAN` - [VIP]聚合函数: 中位数
+* :py:func:`AGG_PROD` - [VIP]聚合函数: 乘积
+* :py:func:`AGG_SUM` - [VIP]聚合函数: 总和
+* :py:func:`AGG_STD` - [VIP]聚合函数: 标准差
+* :py:func:`AGG_VAR` - [VIP]聚合函数: 方差
+* :py:func:`AGG_QUANTILE` - [VIP]聚合函数: 分位数
 
 
 **时间指标**

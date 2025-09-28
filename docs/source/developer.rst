@@ -39,6 +39,12 @@ xmake >= 2.8.2，网址：`<https://github.com/xmake-io/xmake>`_
 
     git clone https://github.com/fasiondog/hikyuu.git
 
+.. note::
+
+    捐赠用户如本地环境已激活（或申请了使用许可且尚未过期）, 请 checkout 已发布的版本分支，并手工从 https://gitee.com/hikyuu-quant/hikyuu_plugin_download  下载对应版本的插件。
+    
+    插件下载后保存在源码 hikyuu/plugin 目录下。
+
 
 4、Linux下安装依赖软件包
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -61,6 +67,8 @@ Linux下需安装依赖的开发软件包。如 Ubuntu 下，执行以下命令�
 
 1. 安装 python 依赖包
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+编译需要 click。 如果下述安装依赖时, 无法安装 PyQt5 的, 可手工删除 requirements.txt 中的 PyQt5 后再继续安装依赖。
 
 .. code-block:: shell
 

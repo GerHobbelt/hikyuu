@@ -14,9 +14,7 @@ namespace hku {
 KDataPrivatedBufferImp::KDataPrivatedBufferImp() : KDataImp() {}
 
 KDataPrivatedBufferImp::KDataPrivatedBufferImp(const Stock& stock, const KQuery& query)
-: KDataImp(stock, query) {
-    m_buffer = m_stock.getKRecordList(query);
-
+: KDataImp(stock, query), m_buffer(m_stock.getKRecordList(query)) {
     // 不支持复权时，直接返回
     if (query.recoverType() == KQuery::NO_RECOVER)
         return;
@@ -113,7 +111,7 @@ size_t KDataPrivatedBufferImp::getPos(const Datetime& datetime) const {
 }
 
 void KDataPrivatedBufferImp::_recoverForUpDay() {
-    HKU_IF_RETURN(empty(), void());
+    HKU_IF_RETURN(m_buffer.empty(), void());
     std::function<Datetime(const Datetime&)> startOfPhase;
     if (m_query.kType() == KQuery::WEEK) {
         startOfPhase = &Datetime::startOfWeek;
@@ -136,7 +134,7 @@ void KDataPrivatedBufferImp::_recoverForUpDay() {
 
     size_t day_pos = 0;
     size_t day_total = day_list.size();
-    size_t length = size();
+    size_t length = m_buffer.size();
     for (size_t i = 0; i < length; i++) {
         Datetime phase_start_date = startOfPhase(m_buffer[i].datetime);
         Datetime phase_end_date = m_buffer[i].datetime;

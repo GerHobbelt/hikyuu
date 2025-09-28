@@ -7,7 +7,6 @@
 
 #include <hikyuu/indicator/Indicator.h>
 #include <hikyuu/views/arrow_views.h>
-#include <arrow/python/pyarrow.h>
 #include "../pybind_utils.h"
 
 namespace py = pybind11;
@@ -280,14 +279,14 @@ set_context(self, stock, query)
                 fields.push_back("datetime64[ns]");
                 offsets.push_back(0);
                 for (size_t i = 0; i < ret_num; i++) {
-                    names.push_back(fmt::format("value{}", i + 1));
+                    names.push_back(fmt::format("value{}", i));
                     fields.push_back("d");
                     offsets.push_back(offsets.back() + sizeof(Indicator::value_t));
                 }
                 bytes_size = sizeof(Datetime) + ret_num * sizeof(Indicator::value_t);
             } else {
                 for (size_t i = 0; i < ret_num; i++) {
-                    names.push_back(fmt::format("value{}", i + 1));
+                    names.push_back(fmt::format("value{}", i));
                     fields.push_back("d");
                     if (i == 0) {
                         offsets.push_back(0);
@@ -347,7 +346,7 @@ set_context(self, stock, query)
             std::vector<std::string> fields;
             std::vector<int64_t> offsets;
             for (size_t i = 0; i < ret_num; i++) {
-                names.push_back(fmt::format("value{}", i + 1));
+                names.push_back(fmt::format("value{}", i));
                 fields.push_back("d");
                 offsets.push_back(i * sizeof(Indicator::value_t));  // 简化偏移计算
             }
@@ -415,7 +414,7 @@ set_context(self, stock, query)
                 for (size_t j = 0; j < total; j++) {
                     dst[j] = src[j];
                 }
-                columns[fmt::format("value{}", i + 1).c_str()] = arr;
+                columns[fmt::format("value{}", i).c_str()] = arr;
             }
 
             return py::module_::import("pandas").attr("DataFrame")(columns,
@@ -441,7 +440,7 @@ set_context(self, stock, query)
                 for (size_t j = 0; j < total; j++) {
                     dst[j] = src[j];
                 }
-                columns[fmt::format("value{}", i + 1).c_str()] = arr;
+                columns[fmt::format("value{}", i).c_str()] = arr;
             }
 
             return py::module_::import("pandas").attr("DataFrame")(columns,
@@ -452,19 +451,13 @@ set_context(self, stock, query)
       .def("to_pyarrow",
            [](const Indicator& self) {
                auto view = getIndicatorView(self);
-               HKU_ASSERT(view);
-               PyObject* raw_obj = arrow::py::wrap_table(view);
-               HKU_CHECK(raw_obj, "Failed to wrap table to pyobject!");
-               return py::reinterpret_steal<py::object>(raw_obj);
+               return to_pyarrow_table(view);
            })
 
       .def("value_to_pyarrow",
            [](const Indicator& self) {
                auto view = getIndicatorValueView(self);
-               HKU_ASSERT(view);
-               PyObject* raw_obj = arrow::py::wrap_table(view);
-               HKU_CHECK(raw_obj, "Failed to wrap table to pyobject!");
-               return py::reinterpret_steal<py::object>(raw_obj);
+               return to_pyarrow_table(view);
            })
 
       .def(py::self + py::self)

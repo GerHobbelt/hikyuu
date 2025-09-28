@@ -683,7 +683,7 @@ void export_Indicator_build_in(py::module& m) {
 
     m.def(
       "PRICELIST",
-      [](const DatetimeList& dates, double value, size_t discard) {
+      [](const DatetimeList& dates, double value, int discard) {
           return PRICELIST(dates, value, discard);
       },
       py::arg("dates"), py::arg("value"), py::arg("discard") = 0);
@@ -979,7 +979,7 @@ void export_Indicator_build_in(py::module& m) {
         Indicator ind2 = seq[1].cast<Indicator>();
         Indicator tmp = WEAVE(ind1, ind2);
         for (size_t i = 2; i < total; i++) {
-            tmp = WEAVE(tmp, seq[i].cast<Indicator>());
+            tmp = WEAVE(tmp, seq[i].cast<const Indicator&>());
         }
         return tmp;
     });
@@ -2258,11 +2258,11 @@ void export_Indicator_build_in(py::module& m) {
     :param Indicator data: 条件指标
     :rtype: Indicator)");
 
-    m.def("UNSAFE_REF", py::overload_cast<int>(UNSAFE_REF), py::arg("n"));
-    m.def("UNSAFE_REF", py::overload_cast<const Indicator&, int>(UNSAFE_REF), py::arg("ind"),
-          py::arg("n"), R"(UNSAFE_REF(ind, n)
+    m.def("REFX", py::overload_cast<int>(REFX), py::arg("n"));
+    m.def("REFX", py::overload_cast<const Indicator&, int>(REFX), py::arg("ind"), py::arg("n"),
+          R"(REFX(ind, n)
 
-    用于获取指标中第n个周期的值, n为正数时从当前周期向前数, 为负数时从当前周期向后数。
+    REF增强(非安全引用, 勿用于回测)。用于获取指标中第n个周期的值, n为正数时从当前周期向前数, 为负数时从当前周期向后数。
 
     :param Indicator ind: 指标
     :param int n: 周期数)");

@@ -8,7 +8,6 @@
 #include <hikyuu/serialization/KData_serialization.h>
 #include <hikyuu/indicator/crt/KDATA.h>
 #include <hikyuu/views/arrow_views.h>
-#include <arrow/python/pyarrow.h>
 #include "pybind_utils.h"
 
 using namespace hku;
@@ -18,6 +17,7 @@ const KRecord& (KData::*KData_getKRecord1)(size_t pos) const = &KData::getKRecor
 const KRecord& (KData::*KData_getKRecord2)(Datetime datetime) const = &KData::getKRecord;
 
 void export_KData(py::module& m) {
+    int64_t null_int64 = Null<int64_t>();
     py::class_<KData>(
       m, "KData",
       "通过 Stock.getKData 获取的K线数据，由 KRecord 组成的数组，可象 list 一样进行遍历")
@@ -132,6 +132,16 @@ void export_KData(py::module& m) {
 
         :param Datetime start: 新的起始日期
         :param Datetime end: 新的结束日期
+        :rtype: KData)")
+
+      .def("get_kdata", py::overload_cast<int64_t, int64_t>(&KData::getKData, py::const_),
+           py::arg("start"), py::arg("end") = null_int64,
+           R"(get_kdata(self, start, end)
+           
+        通过索引获取 KData 子集，相当于切片
+        
+        :param int start: 索引起始位置
+        :param int end: 索引结束位置
         :rtype: KData)")
 
       .def("tocsv", &KData::tocsv, R"(tocsv(self, filename)
@@ -325,10 +335,7 @@ void export_KData(py::module& m) {
       .def("to_pyarrow",
            [](const KData& self) {
                auto view = getKDataView(self);
-               HKU_ASSERT(view);
-               PyObject* raw_obj = arrow::py::wrap_table(view);
-               HKU_CHECK(raw_obj, "Failed to wrap table to pyobject!");
-               return py::reinterpret_steal<py::object>(raw_obj);
+               return to_pyarrow_table(view);
            })
 
         DEF_PICKLE(KData);
