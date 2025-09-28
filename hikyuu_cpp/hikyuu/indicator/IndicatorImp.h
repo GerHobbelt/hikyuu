@@ -78,6 +78,9 @@ public:
 
     value_t get(size_t pos, size_t num = 0) const;
 
+    value_t front(size_t num = 0) const;
+    value_t back(size_t num = 0) const;
+
     value_t getByDate(Datetime, size_t num = 0);
 
     Datetime getDatetime(size_t pos) const;
@@ -208,6 +211,8 @@ protected:
 
     // 用于动态参数时，更新 discard
     void _update_discard();
+
+    virtual bool isPythonObject() const;
 
 protected:
     string m_name;
@@ -410,6 +415,10 @@ inline IndicatorImp::value_t const* IndicatorImp::data(size_t result_idx) const 
 
 inline size_t IndicatorImp::_get_step_start(size_t pos, size_t step, size_t discard) {
     return step == 0 || pos < discard + step ? discard : pos + 1 - step;
+}
+
+inline bool IndicatorImp::isPythonObject() const {
+    return false;
 }
 
 } /* namespace hku */

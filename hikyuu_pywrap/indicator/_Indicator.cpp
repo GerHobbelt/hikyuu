@@ -266,7 +266,8 @@ set_context(self, stock, query)
             auto imp = self.getImp();
             HKU_IF_RETURN(!imp, ret);
             size_t ret_num = imp->getResultNumber();
-            std::unique_ptr<uint64_t[]> buffer(new uint64_t[self.size() * (ret_num + 1)]);
+
+            uint64_t* buffer = new uint64_t[self.size() * (ret_num + 1)];
 
             std::vector<string> names;
             std::vector<string> fields;
@@ -306,8 +307,8 @@ set_context(self, stock, query)
                 src[i] = imp->data(i);
             }
 
-            uint64_t* data = (uint64_t*)buffer.get();
-            double* val = (double*)buffer.get();
+            uint64_t* data = buffer;
+            double* val = (double*)buffer;
             if (!dates.empty()) {
                 size_t x = ret_num + 1;
                 for (size_t i = 0, total = imp->size(); i < total; i++) {
@@ -323,7 +324,10 @@ set_context(self, stock, query)
                     }
                 }
             }
-            ret = py::array(dtype, self.size(), data);
+
+            auto capsule =
+              py::capsule(buffer, [](void* ptr) { delete[] static_cast<uint64_t*>(ptr); });
+            ret = py::array(dtype, self.size(), data, capsule);
             return ret;
         },
         "转化为np.array, 如果为时间序列, 则包含 datetime 日期列")
@@ -331,44 +335,57 @@ set_context(self, stock, query)
       .def(
         "value_to_np",
         [](const Indicator& self) {
-            py::array ret;
-            auto imp = self.getImp();
-            HKU_IF_RETURN(!imp, ret);
-            size_t ret_num = imp->getResultNumber();
-            std::unique_ptr<double[]> buffer(new double[self.size() * ret_num]);
-            std::vector<string> names;
-            std::vector<string> fields;
+            size_t ret_num = self.getResultNumber();
+
+            // 初始化array_t并获取其内部缓冲区
+            py::array_t<double> ret;
+            ret.resize({self.size(), ret_num});  // 二维形状: [size, ret_num]
+            auto buf = ret.request();
+            double* buffer = static_cast<double*>(buf.ptr);  // 从array_t获取指针
+
+            std::vector<std::string> names;
+            std::vector<std::string> fields;
             std::vector<int64_t> offsets;
             for (size_t i = 0; i < ret_num; i++) {
                 names.push_back(fmt::format("value{}", i + 1));
                 fields.push_back("d");
-                if (i == 0) {
-                    offsets.push_back(0);
-                } else {
-                    offsets.push_back(offsets.back() + sizeof(Indicator::value_t));
-                }
+                offsets.push_back(i * sizeof(Indicator::value_t));  // 简化偏移计算
             }
 
             auto dtype = py::dtype(
-              vector_to_python_list<string>(names), vector_to_python_list<string>(fields),
+              vector_to_python_list<std::string>(names), vector_to_python_list<std::string>(fields),
               vector_to_python_list<int64_t>(offsets), ret_num * sizeof(Indicator::value_t));
 
             std::vector<const Indicator::value_t*> src(ret_num);
             for (size_t i = 0; i < ret_num; i++) {
-                src[i] = imp->data(i);
+                src[i] = self.data(i);
             }
 
-            double* val = buffer.get();
-            size_t x = ret_num;
-            for (size_t i = 0, total = imp->size(); i < total; i++) {
+            // 填充数据到array_t的缓冲区
+            for (size_t i = 0, total = self.size(); i < total; i++) {
                 for (size_t j = 0; j < ret_num; j++) {
-                    val[i * x + j] = src[j][i];
+                    buffer[i * ret_num + j] = src[j][i];
                 }
             }
-            ret = py::array(dtype, self.size(), val);
-            return ret;
+
+            return py::array(dtype, {self.size()}, {ret_num * sizeof(double)}, buf.ptr, ret);
         },
         "仅转化值为np.array, 不包含日期列")
+
+      .def(
+        "to_array",
+        [](const Indicator& self, size_t result_index) {
+            HKU_CHECK(result_index < self.getResultNumber(), "result_index out of range");
+            auto ret = py::array_t<double>(self.size());
+            auto buf = ret.request();
+            double* ptr = static_cast<double*>(buf.ptr);
+            const auto* src = self.data(result_index);
+            for (size_t i = 0; i < self.size(); i++) {
+                ptr[i] = src[i];
+            }
+            return ret;
+        },
+        py::arg("result_index") = 0, "将指定结果集转化为numpy.array")
 
       .def(
         "to_df",
@@ -390,14 +407,15 @@ set_context(self, stock, query)
             }
 
             size_t ret_num = self.getResultNumber();
-            std::vector<double> value(total);
             for (size_t i = 0; i < ret_num; i++) {
+                py::array_t<double> arr(total);
+                auto buf = arr.request();
+                double* dst = static_cast<double*>(buf.ptr);
                 const auto* src = self.data(i);
                 for (size_t j = 0; j < total; j++) {
-                    value[j] = src[j];
+                    dst[j] = src[j];
                 }
-                columns[fmt::format("value{}", i + 1).c_str()] =
-                  py::array_t<double>(total, value.data(), py::dtype("float64"));
+                columns[fmt::format("value{}", i + 1).c_str()] = arr;
             }
 
             return py::module_::import("pandas").attr("DataFrame")(columns,
@@ -415,14 +433,15 @@ set_context(self, stock, query)
 
             py::dict columns;
             size_t ret_num = self.getResultNumber();
-            std::vector<double> value(total);
             for (size_t i = 0; i < ret_num; i++) {
+                py::array_t<double> arr(total);
+                auto buf = arr.request();
+                double* dst = static_cast<double*>(buf.ptr);
                 const auto* src = self.data(i);
                 for (size_t j = 0; j < total; j++) {
-                    value[j] = src[j];
+                    dst[j] = src[j];
                 }
-                columns[fmt::format("value{}", i + 1).c_str()] =
-                  py::array_t<double>(total, value.data(), py::dtype("float64"));
+                columns[fmt::format("value{}", i + 1).c_str()] = arr;
             }
 
             return py::module_::import("pandas").attr("DataFrame")(columns,
@@ -433,21 +452,19 @@ set_context(self, stock, query)
       .def("to_pyarrow",
            [](const Indicator& self) {
                auto view = getIndicatorView(self);
-               HKU_ARROW_TABLE_CHECK(view);
-               arrow::py::import_pyarrow();
-               PyObject* raw_obj = arrow::py::wrap_table(*view);
+               HKU_ASSERT(view);
+               PyObject* raw_obj = arrow::py::wrap_table(view);
                HKU_CHECK(raw_obj, "Failed to wrap table to pyobject!");
-               return py::reinterpret_borrow<py::object>(raw_obj);
+               return py::reinterpret_steal<py::object>(raw_obj);
            })
 
       .def("value_to_pyarrow",
            [](const Indicator& self) {
                auto view = getIndicatorValueView(self);
-               HKU_ARROW_TABLE_CHECK(view);
-               arrow::py::import_pyarrow();
-               PyObject* raw_obj = arrow::py::wrap_table(*view);
+               HKU_ASSERT(view);
+               PyObject* raw_obj = arrow::py::wrap_table(view);
                HKU_CHECK(raw_obj, "Failed to wrap table to pyobject!");
-               return py::reinterpret_borrow<py::object>(raw_obj);
+               return py::reinterpret_steal<py::object>(raw_obj);
            })
 
       .def(py::self + py::self)
