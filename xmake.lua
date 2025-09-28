@@ -6,7 +6,7 @@ set_project("hikyuu")
 add_rules("mode.debug", "mode.release")
 
 -- version
-set_version("2.6.6", {build = "%Y%m%d%H%M"})
+set_version("2.6.7", {build = "%Y%m%d%H%M"})
 
 set_warnings("all")
 
@@ -157,6 +157,11 @@ add_requires("nng " .. nng_version, {system = false, configs = {NNG_ENABLE_TLS =
 add_requires("nlohmann_json", {system = false})
 add_requires("xxhash", {system = false})
 add_requires("utf8proc", {system = false})
+if get_config("leak_check") then
+    add_requires("arrow", {system = false, configs = {shared = true}})
+else
+    add_requires("arrow", {system = false})
+end
 
 if has_config("http_client_zip") then
     add_requires("gzip-hpp", {system = false})
@@ -217,6 +222,8 @@ end
 
 includes("./copy_dependents.lua")
 includes("./hikyuu_cpp/hikyuu")
-includes("./hikyuu_pywrap")
-includes("./hikyuu_cpp/unit_test")
 includes("./hikyuu_cpp/demo")
+if not is_plat("cross") then
+  includes("./hikyuu_pywrap")
+  includes("./hikyuu_cpp/unit_test")
+end
