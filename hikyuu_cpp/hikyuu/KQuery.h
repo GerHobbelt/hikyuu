@@ -47,10 +47,12 @@ public:
     static const string DAY5;
     static const string DAY7;
     static const string MIN3;
-    static const string HOUR4;
-    static const string HOUR6;
-    static const string HOUR12;
-    // static const string INVALID_KTYPE;
+    static const string HOUR4;   // 默认不支持
+    static const string HOUR6;   // 默认不支持
+    static const string HOUR12;  // 默认不支持
+
+    static const string TIMELINE;  // 分时
+    static const string TRANS;     // 分笔
 
     /** 判断指定的K线类型是否有效 */
     static bool isValidKType(const string& ktype);
@@ -70,6 +72,8 @@ public:
     static int32_t getKTypeInMin(const KType& ktype);
 
     static int32_t getBaseKTypeInMin(const KType& ktype);
+
+    static int64_t getKTypeInSeconds(const KType& ktype);
 
     /**
      * 复权类型
@@ -174,6 +178,14 @@ public:
      * @return size_t
      */
     uint64_t hash() const;
+
+    /** 判断是否为右开区间，即未指定结束时间 */
+    bool isRightOpening() const {
+        if (m_queryType == DATE) {
+            return endDatetime().isNull();
+        }
+        return m_end == Null<int64_t>();
+    }
 
     /** 获取queryType名称，用于显示输出 */
     static string getQueryTypeName(QueryType);

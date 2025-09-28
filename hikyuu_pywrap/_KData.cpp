@@ -117,7 +117,16 @@ void export_KData(py::module& m) {
 
         :rtype: Stock)")
 
-      .def("get_kdata", &KData::getKData, R"(get_kdata(self, start_date, end_date)
+      .def("get_kdata", py::overload_cast<const KQuery::KType&>(&KData::getKData, py::const_),
+           py::arg("ktype"), R"(get_kdata(self, ktype
+           
+        获取相同时间范围内的其他类型K线数据，如日线下对应的分钟线数据
+
+        :param KQuery::KType ktype: 指定需要的K线类型)")
+
+      .def("get_kdata",
+           py::overload_cast<const Datetime&, const Datetime&>(&KData::getKData, py::const_),
+           R"(get_kdata(self, start_date, end_date)
       
         通过当前 KData 获取一个保持数据类型、复权类型不变的新的 KData（注意，不是原 KData 的子集）
 
@@ -150,7 +159,7 @@ void export_KData(py::module& m) {
                } else if (py::isinstance<Datetime>(obj)) {
                    Datetime dt = py::cast<Datetime>(obj);
                    auto krecord = self.getKRecord(dt);
-                   if (krecord == Null<KRecord>()) {
+                   if (!krecord.isValid()) {
                        throw std::out_of_range(fmt::format("datetime out of range: {}", dt));
                    }
                    ret = py::cast(krecord);
@@ -158,7 +167,7 @@ void export_KData(py::module& m) {
                } else if (py::isinstance<py::str>(obj)) {
                    Datetime dt = Datetime(py::cast<std::string>(obj));
                    auto krecord = self.getKRecord(dt);
-                   if (krecord == Null<KRecord>()) {
+                   if (!krecord.isValid()) {
                        throw std::out_of_range(fmt::format("datetime out of range: {}", dt));
                    }
                    ret = py::cast(krecord);

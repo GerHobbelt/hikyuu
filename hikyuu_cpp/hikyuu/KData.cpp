@@ -7,13 +7,15 @@
 
 #include "KData.h"
 #include "StockManager.h"
-#include "KDataImp.h"
+#include "KDataSharedBufferImp.h"
+#include "KDataPrivatedBufferImp.h"
 #include "indicator/crt/KDATA.h"
+#include "plugin/hkuextra.h"
 #include <fstream>
 
 namespace hku {
 
-KRecord KData::ms_null_krecord;
+shared_ptr<KDataImp> KData::ms_null_kdata_imp{make_shared<KDataImp>()};
 
 HKU_API std::ostream& operator<<(std::ostream& os, const KData& kdata) {
     os << "KData{\n  size : " << kdata.size() << "\n  stock: " << kdata.getStock()
@@ -42,10 +44,19 @@ string KData::toString() const {
     return os.str();
 }
 
-KData::KData() : m_imp(make_shared<KDataImp>()) {}
+KData::KData() : m_imp(ms_null_kdata_imp) {}
 
-KData::KData(const Stock& stock, const KQuery& query)
-: m_imp(make_shared<KDataImp>(stock, query)) {}
+KData::KData(const Stock& stock, const KQuery& query) {
+    // 在重加载或setKDateList时，已存在KData存在数据无效风险（但无内存访问问题)
+    if (stock.isNull()) {
+        m_imp = ms_null_kdata_imp;
+    } else if (query.recoverType() == KQuery::NO_RECOVER && stock.isBuffer(query.kType())) {
+        // 当Stock已缓存了该类型的K线数据，且不进行复权
+        m_imp = make_shared<KDataSharedBufferImp>(stock, query);
+    } else {
+        m_imp = getKDataImp(stock, query);
+    }
+}
 
 bool KData::operator==(const KData& thr) const {
     return this == &thr || m_imp == thr.m_imp ||
@@ -79,12 +90,53 @@ void KData::tocsv(const string& filename) {
 
 KData KData::getKData(const Datetime& start, const Datetime& end) const {
     const Stock& stk = getStock();
-    if (stk.isNull()) {
-        return KData();
-    }
+    HKU_IF_RETURN(stk.isNull(), KData());
 
     const KQuery& query = getQuery();
     return KData(stk, KQueryByDate(start, end, query.kType(), query.recoverType()));
+}
+
+KData KData::getKData(const KQuery::KType& ktype) const {
+    const Stock& stk = getStock();
+    HKU_IF_RETURN(stk.isNull(), KData());
+
+    const KQuery& query = getQuery();
+    HKU_IF_RETURN(query.kType() == ktype, *this);
+
+    if (empty()) {
+        if (query.queryType() == KQuery::INDEX) {
+            return KData(stk, KQuery(0, 0, ktype, query.recoverType()));
+        }
+        return KData(
+          stk, KQuery(query.startDatetime(), query.endDatetime(), ktype, query.recoverType()));
+    }
+
+    Datetime end;
+    if ((query.queryType() == KQuery::INDEX && query.end() == Null<int64_t>()) ||
+        (query.queryType() == KQuery::DATE && query.endDatetime() == Null<Datetime>())) {
+        end = Null<Datetime>();
+    } else {
+        end = this->back().datetime;
+    }
+
+    Datetime start = this->front().datetime;
+
+    auto day_ktype_seconds = KQuery::getKTypeInSeconds(KQuery::DAY);
+    // 从日线及以上转日线以下
+    if (KQuery::getKTypeInSeconds(ktype) < day_ktype_seconds &&
+        KQuery::getKTypeInSeconds(query.kType()) >= day_ktype_seconds) {
+        if (end != Null<Datetime>()) {
+            end = end.endOfDay();
+        }
+    }
+
+    // 从日线以下转日线及以上
+    if (KQuery::getKTypeInSeconds(ktype) >= day_ktype_seconds &&
+        KQuery::getKTypeInSeconds(query.kType()) < day_ktype_seconds) {
+        start = start.startOfDay();
+    }
+
+    return KData(stk, KQuery(start, end, ktype, query.recoverType()));
 }
 
 Indicator KData::open() const {

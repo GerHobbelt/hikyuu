@@ -1,13 +1,11 @@
 /*
- * KDataImp.h
+ *  Copyright (c) 2025 hikyuu.org
  *
- *  Created on: 2013-2-4
+ *  Created on: 2025-08-28
  *      Author: fasiondog
  */
 
 #pragma once
-#ifndef KDATAIMP_H_
-#define KDATAIMP_H_
 
 #include "Stock.h"
 
@@ -15,7 +13,7 @@ namespace hku {
 
 class HKU_API KDataImp {
 public:
-    KDataImp();
+    KDataImp() = default;
     KDataImp(const Stock& stock, const KQuery& query);
     virtual ~KDataImp();
 
@@ -27,80 +25,59 @@ public:
         return m_stock;
     }
 
-    const KRecord& getKRecord(size_t pos) const {
-        return m_buffer[pos];
+    virtual bool empty() const {
+        return true;
     }
 
-    const KRecord& front() const {
-        return m_buffer.front();
+    virtual size_t size() const {
+        return 0;
     }
 
-    const KRecord& back() const {
-        return m_buffer.back();
+    virtual size_t startPos() const {
+        return 0;
     }
 
-    bool empty() const {
-        return m_buffer.empty();
+    virtual size_t endPos() const {
+        return 0;
     }
 
-    size_t size() {
-        return m_buffer.size();
+    virtual size_t lastPos() const {
+        return 0;
     }
 
-    size_t startPos();
-    size_t endPos();
-    size_t lastPos();
-
-    size_t getPos(const Datetime& datetime);
-
-    const KRecord* data() const {
-        return m_buffer.data();
+    virtual size_t getPos(const Datetime& datetime) const {
+        return Null<size_t>();
     }
 
-    KRecord* data() {
-        return m_buffer.data();
+    virtual const KRecord& getKRecord(size_t pos) const {
+        return KRecord::NullKRecord;
     }
 
-    DatetimeList getDatetimeList() const;
-
-public:
-    typedef KRecordList::iterator iterator;
-    typedef KRecordList::const_iterator const_iterator;
-
-    iterator begin() {
-        return m_buffer.begin();
+    virtual const KRecord& front() const {
+        return KRecord::NullKRecord;
     }
 
-    iterator end() {
-        return m_buffer.end();
+    virtual const KRecord& back() const {
+        return KRecord::NullKRecord;
     }
 
-    const_iterator cbegin() const {
-        return m_buffer.cbegin();
+    virtual const KRecord* data() const {
+        return nullptr;
     }
 
-    const_iterator cend() const {
-        return m_buffer.cend();
+    virtual KRecord* data() {
+        return nullptr;
     }
 
-private:
-    void _getPosInStock();
-    void _recoverForward();
-    void _recoverBackward();
-    void _recoverEqualForward();
-    void _recoverEqualBackward();
-    void _recoverForUpDay();
+    virtual DatetimeList getDatetimeList() const {
+        return DatetimeList();
+    }
 
-private:
-    KRecordList m_buffer;
+protected:
     KQuery m_query;
     Stock m_stock;
-    size_t m_start;
-    size_t m_end;
-    bool m_have_pos_in_stock;
 };
 
 typedef shared_ptr<KDataImp> KDataImpPtr;
 
 } /* namespace hku */
-#endif /* KDATAIMP_H_ */

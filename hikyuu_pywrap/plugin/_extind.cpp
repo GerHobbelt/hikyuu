@@ -8,6 +8,12 @@
 #include "hikyuu/plugin/extind.h"
 #include "../pybind_utils.h"
 
+#define PY_AGG_FUNC_DEFINE(agg_func)                                                             \
+    m.def(#agg_func, py::overload_cast<const KQuery::KType&, bool>(&agg_func),                   \
+          py::arg("ktype") = KQuery::MIN, py::arg("fill_null") = false);                         \
+    m.def(#agg_func, py::overload_cast<const Indicator&, const KQuery::KType&, bool>(&agg_func), \
+          py::arg("ind"), py::arg("ktype") = KQuery::MIN, py::arg("fill_null") = false);
+
 void export_extend_Indicator(py::module& m) {
     m.def("WITHKTYPE", py::overload_cast<const KQuery::KType&, bool>(WITHKTYPE), py::arg("ktype"),
           py::arg("fill_null") = false);
@@ -176,15 +182,36 @@ void export_extend_Indicator(py::module& m) {
     :param bool fill_null: 是否填充空值
     :rtype: Indicator)");
 
-    m.def("RANK", py::overload_cast<const Block&, const Indicator&, int, bool, const string&>(RANK),
-          py::arg("block"), py::arg("ref_ind"), py::arg("mode") = 0, py::arg("fill_null") = true,
-          py::arg("market") = "SH");
+    m.def(
+      "RANK",
+      [](const py::sequence stks, int mode, bool fill_null, const string& market) {
+          Block blk;
+          if (py::isinstance<Block>(stks)) {
+              blk = py::cast<Block>(stks);
+          } else if (py::isinstance<StockManager>(stks)) {
+              auto& sm = py::cast<StockManager&>(stks);
+              blk.add(sm.getStockList());
+          } else {
+              StockList sl = python_list_to_vector<Stock>(stks);
+              blk.add(sl);
+          }
+          return RANK(blk, mode, fill_null, market);
+      },
+      py::arg("stks"), py::arg("mode") = 0, py::arg("fill_null") = true, py::arg("market") = "SH");
     m.def(
       "RANK",
       [](const py::sequence stks, const Indicator& ref_ind, int mode, bool fill_null,
          const string& market) {
           Block blk;
-          blk.add(python_list_to_vector<Stock>(stks));
+          if (py::isinstance<Block>(stks)) {
+              blk = py::cast<Block>(stks);
+          } else if (py::isinstance<StockManager>(stks)) {
+              auto& sm = py::cast<StockManager&>(stks);
+              blk.add(sm.getStockList());
+          } else {
+              StockList sl = python_list_to_vector<Stock>(stks);
+              blk.add(sl);
+          }
           return RANK(blk, ref_ind, mode, fill_null, market);
       },
       py::arg("stks"), py::arg("ref_ind"), py::arg("mode") = 0, py::arg("fill_null") = true,
@@ -199,4 +226,7 @@ void export_extend_Indicator(py::module& m) {
     :param market: 板块所属市场
     :return: 指标值在指定板块中的排名
     :rtype: Indicator)");
+
+    PY_AGG_FUNC_DEFINE(AGG_MEAN)
+    PY_AGG_FUNC_DEFINE(AGG_COUNT)
 }

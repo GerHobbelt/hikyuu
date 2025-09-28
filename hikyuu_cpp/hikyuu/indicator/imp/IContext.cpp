@@ -69,6 +69,11 @@ KData IContext::getContextKdata() const {
     return m_ref_ind.getContext();
 }
 
+bool IContext::selfAlike(const IndicatorImp& other) const noexcept {
+    const auto& other_ctx = dynamic_cast<const IContext&>(other);
+    return m_ref_ind.getImp()->alike(*other_ctx.m_ref_ind.getImp());
+}
+
 void IContext::_calculate(const Indicator& ind) {
     HKU_ASSERT(isLeaf());
 
@@ -124,7 +129,8 @@ void IContext::_calculate(const Indicator& ind) {
     }
 
     size_t total = ref.size();
-    _readyBuffer(total, ref.getResultNumber());
+    size_t rtotal = ref.getResultNumber();
+    _readyBuffer(total, rtotal);
 
     m_discard = ref.discard();
     if (m_discard >= total) {
@@ -132,8 +138,6 @@ void IContext::_calculate(const Indicator& ind) {
         return;
     }
 
-    size_t rtotal = ref.getResultNumber();
-    _readyBuffer(total, rtotal);
     size_t len = sizeof(value_t) * (total - m_discard);
     for (size_t r = 0; r < rtotal; ++r) {
         const auto* src = ref.data(r) + m_discard;

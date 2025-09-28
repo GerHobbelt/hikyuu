@@ -31,6 +31,11 @@ void ICval::_checkParam(const string& name) const {
     }
 }
 
+bool ICval::selfAlike(const IndicatorImp& other) const noexcept {
+    HKU_IF_RETURN(isLeaf() && other.isLeaf(), true);
+    return m_right && m_right->alike(*other.getRightNode());
+}
+
 void ICval::_calculate(const Indicator& data) {
     double value = getParam<double>("value");
     int discard = getParam<int>("discard");
@@ -65,9 +70,17 @@ void ICval::_calculate(const Indicator& data) {
 
     m_discard = discard > total ? total : discard;
 
-    auto* dst = this->data();
-    for (size_t i = m_discard; i < total; ++i) {
-        dst[i] = value;
+    size_t ret_num = data.getResultNumber();
+    if (ret_num == 0) {
+        ret_num = 1;
+    }
+    _readyBuffer(total, ret_num);
+
+    for (size_t r = 0; r < ret_num; ++r) {
+        auto* dst = this->data(r);
+        for (size_t i = m_discard; i < total; ++i) {
+            dst[i] = value;
+        }
     }
 }
 

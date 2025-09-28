@@ -68,6 +68,13 @@ public:
      */
     KData getKData(const Datetime& start, const Datetime& end) const;
 
+    /**
+     * 获取相同时间范围内的其他类型K线数据，如日线下对应的分钟线数据
+     * @param ktype
+     * @return KData
+     */
+    KData getKData(const KQuery::KType& ktype) const;
+
     /** 按日期查询对应的索引位置，注：是 KData 中的位置，不是在 Stock 中原始K记录的位置 */
     size_t getPos(const Datetime& datetime) const;
 
@@ -113,17 +120,70 @@ public:
     Indicator amo() const;
 
 public:
-    typedef KRecordList::iterator iterator;
-    typedef KRecordList::const_iterator const_iterator;
-    iterator begin();
-    iterator end();
-    const_iterator cbegin() const;
-    const_iterator cend() const;
     const KRecord* data() const;
     KRecord* data();  // 谨慎使用（用于强制调整数据）
 
+    // 常量迭代器定义
+    class const_iterator {
+    public:
+        using iterator_category = std::forward_iterator_tag;
+        using value_type = const KRecord;
+        using difference_type = std::ptrdiff_t;
+        using pointer = const KRecord*;
+        using reference = const KRecord&;
+
+        const_iterator(const KData& container, size_t index)
+        : container_(container), index_(index) {}
+
+        reference operator*() const {
+            return container_[index_];
+        }
+        pointer operator->() const {
+            return &(container_[index_]);
+        }
+
+        const_iterator& operator++() {
+            ++index_;
+            return *this;
+        }
+
+        const_iterator operator++(int) {
+            const_iterator temp = *this;
+            ++index_;
+            return temp;
+        }
+
+        bool operator==(const const_iterator& other) const {
+            return &container_ == &other.container_ && index_ == other.index_;
+        }
+
+        bool operator!=(const const_iterator& other) const {
+            return !(*this == other);
+        }
+
+    private:
+        const KData& container_;  // 常量引用容器
+        size_t index_;            // 当前索引
+    };
+
+    using iterator = const_iterator;
+
+    const_iterator begin() const {
+        return const_iterator(*this, 0);
+    }
+    const_iterator end() const {
+        return const_iterator(*this, size());
+    }
+
+    const_iterator cbegin() const {
+        return const_iterator(*this, 0);
+    }
+    const_iterator cend() const {
+        return const_iterator(*this, size());
+    }
+
 private:
-    static KRecord ms_null_krecord;
+    static shared_ptr<KDataImp> ms_null_kdata_imp;
 
 private:
     KDataImpPtr m_imp;
@@ -180,7 +240,9 @@ KData HKU_API getKData(const string& market_code, int64_t start = 0, int64_t end
 
 inline KData::KData(const KData& x) : m_imp(x.m_imp) {}
 
-inline KData::KData(KData&& x) : m_imp(std::move(x.m_imp)) {}
+inline KData::KData(KData&& x) : m_imp(std::move(x.m_imp)) {
+    x.m_imp = ms_null_kdata_imp;
+}
 
 inline KData& KData::operator=(const KData& x) {
     if (this == &x)
@@ -193,6 +255,7 @@ inline KData& KData::operator=(KData&& x) {
     if (this == &x)
         return *this;
     m_imp = std::move(x.m_imp);
+    x.m_imp = ms_null_kdata_imp;
     return *this;
 }
 
@@ -206,7 +269,7 @@ inline const KRecord& KData::getKRecord(size_t pos) const {
 
 inline const KRecord& KData::getKRecord(Datetime datetime) const {
     size_t pos = getPos(datetime);
-    return pos != Null<size_t>() ? getKRecord(pos) : ms_null_krecord;
+    return pos != Null<size_t>() ? getKRecord(pos) : KRecord::NullKRecord;
 }
 
 inline size_t KData::getPos(const Datetime& datetime) const {
@@ -251,22 +314,6 @@ inline size_t KData::lastPos() const {
 
 inline bool KData::operator!=(const KData& other) const {
     return !(*this == other);
-}
-
-inline KData::iterator KData::begin() {
-    return m_imp->begin();
-}
-
-inline KData::iterator KData::end() {
-    return m_imp->end();
-}
-
-inline KData::const_iterator KData::cbegin() const {
-    return m_imp->cbegin();
-}
-
-inline KData::const_iterator KData::cend() const {
-    return m_imp->cend();
 }
 
 inline const KRecord* KData::data() const {

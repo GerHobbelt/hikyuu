@@ -146,5 +146,36 @@ inline Indicator WITHHOUR4(const Indicator& ind, bool fill_null = false) {
  */
 Indicator HKU_API RANK(const Block& block, const Indicator& ref_ind, int mode = 0,
                        bool fill_null = true, const string& market = "SH");
+Indicator HKU_API RANK(const Block& block, int mode = 0, bool fill_null = true,
+                       const string& market = "SH");
+
+/**
+ * @brief 聚合其他K线周期统计值，聚合计算指定K线类型数据均值到以上下文中的K线周期
+ * @param ktype 指定K线周期
+ * @param fill_null 是否填充null数据
+ * @param unit 聚合周期单位，默认为1。按上下文K线 unit 个周期计算
+ * @return Indicator
+ */
+#define AGG_FUNC_DEFINE(agg_name)                                                                 \
+    Indicator HKU_API agg_name(const KQuery::KType& ktype = KQuery::MIN, bool fill_null = false); \
+    Indicator HKU_API agg_name(const Indicator& ind, const KQuery::KType& ktype = KQuery::MIN,    \
+                               bool fill_null = false);
+
+#define AGG_FUNC_IMP(agg_name)                                                                     \
+    Indicator HKU_API agg_name(const KQuery::KType& ktype, bool fill_null) {                       \
+        Parameter params;                                                                          \
+        params.set<string>("ktype", ktype);                                                        \
+        params.set<bool>("fill_null", fill_null);                                                  \
+        return getExtIndicator(#agg_name, params);                                                 \
+    }                                                                                              \
+    Indicator HKU_API agg_name(const Indicator& ind, const KQuery::KType& ktype, bool fill_null) { \
+        Parameter params;                                                                          \
+        params.set<string>("ktype", ktype);                                                        \
+        params.set<bool>("fill_null", fill_null);                                                  \
+        return getExtIndicator(#agg_name, ind, params);                                            \
+    }
+
+AGG_FUNC_DEFINE(AGG_MEAN)
+AGG_FUNC_DEFINE(AGG_COUNT)
 
 }  // namespace hku

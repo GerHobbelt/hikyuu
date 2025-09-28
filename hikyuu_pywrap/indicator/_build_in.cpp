@@ -683,6 +683,16 @@ void export_Indicator_build_in(py::module& m) {
 
     m.def(
       "PRICELIST",
+      [](const DatetimeList& dates, double value, size_t discard) {
+          return PRICELIST(dates, value, discard);
+      },
+      py::arg("dates"), py::arg("value"), py::arg("discard") = 0);
+    m.def(
+      "PRICELIST",
+      [](size_t size, double value, int discard) { return PRICELIST(size, value, discard); },
+      py::arg("size"), py::arg("value"), py::arg("discard") = 0);
+    m.def(
+      "PRICELIST",
       [](const py::object& obj = py::none(), int discard = 0,
          const py::object& pyalign_dates = py::none()) {
           if (obj.is_none()) {
@@ -1765,17 +1775,17 @@ void export_Indicator_build_in(py::module& m) {
     :rtype: Indicator)");
 
     m.def("SLICE", SLICE_1, py::arg("data"), py::arg("start"), py::arg("end"));
-    m.def("SLICE", SLICE_2, py::arg("start"), py::arg("end"), py::arg("result_index") = 0);
+    m.def("SLICE", SLICE_2, py::arg("start"), py::arg("end"), py::arg("result_index") = -1);
     m.def("SLICE", SLICE_3, py::arg("data"), py::arg("start"), py::arg("end"),
           py::arg("result_index") = 0,
-          R"(SLICE(data, start, end, result_index=0)
+          R"(SLICE(data, start, end, result_index=-1)
 
     获取某指标中指定范围 [start, end) 的数据，生成新的指标
 
     :param Indicator|PriceList data: 输入数据
     :param int start: 起始位置
     :param int end: 终止位置（不包含本身）
-    :param int result_index: 原输入数据中的结果集)");
+    :param int result_index: 原输入数据中的结果集, 小于0时表示全部结果集)");
 
     m.def("RSI", RSI_1, py::arg("n") = 14);
     m.def("RSI", RSI_2, py::arg("data"), py::arg("n") = 14, R"(RSI([data, n=14])
@@ -1996,12 +2006,22 @@ void export_Indicator_build_in(py::module& m) {
     :param Sequence stks: stock list
     :param Query query: 统计范围)");
 
+    m.def("INSUM", py::overload_cast<const Block&, int, bool>(INSUM), py::arg("block"),
+          py::arg("mode"), py::arg("fill_null") = true);
     m.def("INSUM", py::overload_cast<const Block&, const Indicator&, int, bool>(INSUM),
           py::arg("block"), py::arg("ind"), py::arg("mode"), py::arg("fill_null") = true);
     m.def("INSUM",
           py::overload_cast<const Block&, const KQuery&, const Indicator&, int, bool>(INSUM),
           py::arg("block"), py::arg("query"), py::arg("ind"), py::arg("mode"),
           py::arg("fill_null") = true);
+    m.def(
+      "INSUM",
+      [](const py::sequence stks, int mode, bool fill_null) {
+          Block blk;
+          blk.add(python_list_to_vector<Stock>(stks));
+          return INSUM(blk, mode, fill_null);
+      },
+      py::arg("stks"), py::arg("mode"), py::arg("fill_null") = true);
     m.def(
       "INSUM",
       [](const py::sequence stks, const Indicator& ind, int mode, bool fill_null) {

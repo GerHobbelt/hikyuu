@@ -8,7 +8,6 @@
 #include "hikyuu/StockTypeInfo.h"
 #include "hikyuu/indicator/crt/KDATA.h"
 #include "hikyuu/indicator/crt/ALIGN.h"
-#include "hikyuu/indicator/crt/SLICE.h"
 #include "IIndex.h"
 
 #if HKU_SUPPORT_SERIALIZATION
@@ -72,8 +71,8 @@ void IIndex::_calculate(const Indicator& ind) {
     setParam<string>("market_code", market_code);
 
     KQuery query = k.getQuery();
-    auto minutes = KQuery::getKTypeInMin(query.kType());
-    query = KQueryByDate(k[0].datetime, k[total - 1].datetime + Minutes(minutes), query.kType(),
+    auto secs = KQuery::getKTypeInSeconds(query.kType());
+    query = KQueryByDate(k[0].datetime, k[total - 1].datetime + Seconds(secs), query.kType(),
                          query.recoverType());
 
     KData index_k = getKData(market_code, query);
