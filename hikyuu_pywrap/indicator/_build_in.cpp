@@ -657,16 +657,21 @@ void export_Indicator_build_in(py::module& m) {
     :param data: 输入数据 KData
     :rtype: Indicator)");
 
-    m.def("CONTEXT", py::overload_cast<bool>(hku::CONTEXT), py::arg("fill_null") = true);
-    m.def("CONTEXT", py::overload_cast<const Indicator&, bool>(hku::CONTEXT), py::arg("ind"),
-          py::arg("fill_null") = true, R"(CONTEXT(ind)
+    m.def("CONTEXT", py::overload_cast<bool, bool, bool>(hku::CONTEXT),
+          py::arg("fill_null") = false, py::arg("use_self_ktype") = false,
+          py::arg("use_self_recover_type") = false);
+    m.def("CONTEXT", py::overload_cast<const Indicator&, bool, bool, bool>(hku::CONTEXT),
+          py::arg("ind"), py::arg("fill_null") = false, py::arg("use_self_ktype") = false,
+          py::arg("use_self_recover_type") = false, R"(CONTEXT(ind)
     
     独立上下文。使用 ind 自带的上下文。当指定新的上下文时，不会改变已有的上下文。
     例如：ind = CLOSE(k1), 当指定新的上下文 ind = ind(k2) 时，使用的是 k2 的收盘价。如想仍使用 k1 收盘价，
     则需使用 ind = CONTEXT(CLOSE(k1)), 此时 ind(k2) 将仍旧使用 k1 的收盘价。
     
     :param Indicator ind: 指标对象
-    :param bool fill_null: 日期对齐时，缺失日期对应填充空值
+    :param bool fill_null: 日期对齐时，缺失日期对应填充空值，否则使用前值填充。
+    :param bool use_self_ktype: 公式计算时使用自身独立上下文中的KTYPE
+    :param bool use_self_recover_type: 公式计算时使用自身独立上下文中的RECOVER_TYPE
     :rtype: Indicator)");
 
     m.def("CONTEXT_K", CONTEXT_K, R"(CONTEXT_K(ind)
@@ -1989,18 +1994,7 @@ void export_Indicator_build_in(py::module& m) {
     m.def("INSUM",
           py::overload_cast<const Block&, const KQuery&, const Indicator&, int, bool>(INSUM),
           py::arg("block"), py::arg("query"), py::arg("ind"), py::arg("mode"),
-          py::arg("fill_null") = true,
-          R"(INSUM(block, query, ind, mode[, fill_null=True])
-
-    返回板块各成分该指标相应输出按计算类型得到的计算值.计算类型:0-累加,1-平均数,2-最大值,3-最小值.
-
-    :param Block block: 指定板块
-    :param Query query: 指定范围
-    :param Indicator ind: 指定指标
-    :param int mode: 计算类型:0-累加,1-平均数,2-最大值,3-最小值.
-    :param bool fill_null: 日期对齐时缺失数据填充 nan 值。
-    :rtype: Indicator)");
-
+          py::arg("fill_null") = true);
     m.def(
       "INSUM",
       [](const py::sequence stks, const Indicator& ind, int mode, bool fill_null) {
@@ -2021,12 +2015,12 @@ void export_Indicator_build_in(py::module& m) {
       py::arg("fill_null") = true,
       R"(INSUM(stks, query, ind, mode[, fill_null=True])
 
-    返回板块各成分该指标相应输出按计算类型得到的计算值.计算类型:0-累加,1-平均数,2-最大值,3-最小值.
+    返回板块各成分该指标相应输出按计算类型得到的计算值.计算类型:0-累加,1-平均数,2-最大值,3-最小值,4-排名(1对应指标值最低), 5-排名(从1开始对应指标值最高).
 
     :param Sequence stks: stock list
     :param Query query: 指定范围
     :param Indicator ind: 指定指标
-    :param int mode: 计算类型:0-累加,1-平均数,2-最大值,3-最小值.
+    :param int mode: 计算类型:0-累加,1-平均数,2-最大值,3-最小值,4-排名(1对应指标值最低), 5-排名(从1开始对应指标值最高).
     :param bool fill_null: 日期对齐时缺失数据填充 nan 值。
     :rtype: Indicator)");
 
