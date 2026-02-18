@@ -3,7 +3,7 @@
 from hikyuu.core import (
     System, SystemPart, ConditionBase, EnvironmentBase, MoneyManagerBase,
     ProfitGoalBase, SelectorBase, SignalBase, SlippageBase, StoplossBase, AllocateFundsBase,
-    MultiFactorBase
+    MultiFactorBase, ScoresFilterBase, NormalizeBase
 )
 
 
@@ -115,17 +115,26 @@ def crtMM(get_buy_num, get_sell_num=None, params={}, name='crtMM', buy_notify=No
 # ------------------------------------------------------------------
 # profitgoal
 # ------------------------------------------------------------------
-def crtPG(func, params={}, name='crtPG'):
+def crtPG(get_goal, calculate=None, params={}, name='crtPG', buy_notify=None, sell_notify=None):
     """
     快速创建盈利目标策略
 
-    :param func: 盈利目标策略函数
+    :param get_goal: 获取目标价格接口
+    :param calculate: 内部计算接口（在指定交易标的时被调用）
     :param {} params: 参数字典
     :param str name: 自定义名称
+    :param buy_notify: 接收买入交易记录通知
+    :param sell_notify: 接收卖出交易记录通知
     :return: 盈利目标策略实例
     """
     meta_x = type(name, (ProfitGoalBase, ), {'__init__': part_init, '_clone': part_clone})
-    meta_x._calculate = func
+    meta_x.get_goal = get_goal
+    if calculate is not None:
+        meta_x._calculate = calculate
+    if buy_notify is not None:
+        meta_x._buy_notify = buy_notify
+    if sell_notify is not None:
+        meta_x._sell_notify = sell_notify
     ret = meta_x(name, params)
     globals().update(dict(_=ret))
     return ret
@@ -145,7 +154,9 @@ def crtSG(func, params={}, name='crtSG'):
     """
     meta_x = type(name, (SignalBase, ), {'__init__': part_init, '_clone': part_clone})
     meta_x._calculate = func
-    return meta_x(name, params)
+    ret = meta_x(name, params)
+    globals().update(dict(_=ret))
+    return ret
 
 
 # ------------------------------------------------------------------
@@ -247,6 +258,44 @@ def crtST(func, params={}, name='crtST'):
     """
     meta_x = type(name, (StoplossBase, ), {'__init__': part_init, '_clone': part_clone})
     meta_x._calculate = func
+    ret = meta_x(name, params)
+    globals().update(dict(_=ret))
+    return ret
+
+
+# ------------------------------------------------------------------
+# SCFilter
+# ------------------------------------------------------------------
+def crtSCFilter(filter_func, params={}, name='crtSCFilter'):
+    """
+    快速创建评分过滤器
+
+    :param filter_func: 评分过滤器函数
+    :param {} params: 参数字典
+    :param str name: 自定义名称
+    :return: 评分过滤器实例
+    """
+    meta_x = type(name, (ScoresFilterBase, ), {'__init__': part_init, '_clone': part_clone})
+    meta_x._filter = filter_func
+    ret = meta_x(name, params)
+    globals().update(dict(_=ret))
+    return ret
+
+
+# ------------------------------------------------------------------
+# Normalize
+# ------------------------------------------------------------------
+def crtNorm(normalize_func, params={}, name='crtNorm'):
+    """
+    快速创建标准化/归一化等算法函数
+
+    :param normalize_func: 算法函数
+    :param {} params: 参数字典
+    :param str name: 自定义名称
+    :return: 函数实例
+    """
+    meta_x = type(name, (NormalizeBase, ), {'__init__': part_init, '_clone': part_clone})
+    meta_x._normalize = normalize_func
     ret = meta_x(name, params)
     globals().update(dict(_=ret))
     return ret

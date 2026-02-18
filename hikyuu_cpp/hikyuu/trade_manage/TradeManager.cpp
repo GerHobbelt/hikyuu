@@ -192,7 +192,7 @@ double TradeManager::getHoldNumber(const Datetime& datetime, const Stock& stock)
 
         if (iter->stock == stock) {
             if (BUSINESS_BUY == iter->business || BUSINESS_GIFT == iter->business ||
-                BUSINESS_CHECKIN_STOCK == iter->business) {
+                BUSINESS_CHECKIN_STOCK == iter->business || BUSINESS_SUOGU == iter->business) {
                 number += iter->number;
 
             } else if (BUSINESS_SELL == iter->business ||
@@ -373,7 +373,7 @@ PositionRecord TradeManager::getPosition(const Datetime& datetime, const Stock& 
 
         if (iter->stock == stock) {
             if (BUSINESS_BUY == iter->business || BUSINESS_GIFT == iter->business ||
-                BUSINESS_CHECKIN_STOCK == iter->business) {
+                BUSINESS_CHECKIN_STOCK == iter->business || BUSINESS_SUOGU == iter->business) {
                 number += iter->number;
 
             } else if (BUSINESS_SELL == iter->business ||
@@ -1262,7 +1262,7 @@ FundsRecord TradeManager::getFunds(const Datetime& indatetime, KQuery::KType kty
         Stock_Number(const Stock& stock, size_t number) : stock(stock), number(number) {}
 
         Stock stock;
-        size_t number;
+        double number;
     };
 
     price_t checkin_cash = 0.0;
@@ -1291,6 +1291,7 @@ FundsRecord TradeManager::getFunds(const Datetime& indatetime, KQuery::KType kty
 
             case BUSINESS_BUY:
             case BUSINESS_GIFT:
+            case BUSINESS_SUOGU:
                 stock_iter = stock_map.find(iter->stock.id());
                 if (stock_iter != stock_map.end()) {
                     stock_iter->second.number += iter->number;
@@ -1490,7 +1491,7 @@ void TradeManager::updateWithWeight(const Datetime& datetime) {
         for (; weight_iter != weights.end(); ++weight_iter) {
             // 如果没有红利并且也（派股和转增股数量都为零），则跳过
             if (0.0 == weight_iter->bonus() && 0.0 == weight_iter->countAsGift() &&
-                0.0 == weight_iter->increasement()) {
+                0.0 == weight_iter->increasement() && 0.0 == weight_iter->suogu()) {
                 continue;
             }
 
@@ -1505,7 +1506,7 @@ void TradeManager::updateWithWeight(const Datetime& datetime) {
                 new_trade_buffer.push_back(record);
             }
 
-            price_t addcount =
+            double addcount =
               (position.number / 10.0) * (weight_iter->countAsGift() + weight_iter->increasement());
             if (addcount != 0.0) {
                 position.number += addcount;
@@ -1514,6 +1515,29 @@ void TradeManager::updateWithWeight(const Datetime& datetime) {
                                    addcount, CostRecord(), 0.0, m_cash, PART_INVALID);
                 new_trade_buffer.push_back(record);
             }
+
+            if (weight_iter->suogu() > 0.0) {
+                double suogu_number = position.number * weight_iter->suogu();
+                double change_number = 0.0;
+                if (suogu_number < position.number) {
+                    // 缩股采用上进位
+                    double old_number = position.number;
+                    position.number = roundUp(suogu_number, 0);
+                    change_number = position.number - old_number;
+                } else if (suogu_number > position.number) {
+                    // 扩股截位法
+                    double old_number = position.number;
+                    position.number = roundDown(suogu_number, 0);
+                    change_number = position.number - old_number;
+                }
+
+                if (change_number != 0.0) {
+                    TradeRecord record(stock, weight_iter->datetime(), BUSINESS_SUOGU, 0.0, 0.0,
+                                       0.0, change_number, CostRecord(), 0.0, m_cash, PART_INVALID);
+                    new_trade_buffer.push_back(record);
+                }
+            }
+
         } /* for weight */
     } /* for position */
 
@@ -1755,6 +1779,7 @@ bool TradeManager::addTradeRecord(const TradeRecord& tr) {
             return _add_sell_tr(tr);
 
         case BUSINESS_GIFT:
+        case BUSINESS_SUOGU:
             return true;
 
         case BUSINESS_BONUS:

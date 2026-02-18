@@ -6,7 +6,7 @@ set_project("hikyuu")
 add_rules("mode.debug", "mode.release")
 
 -- version
-set_version("2.7.0", {build = "%Y%m%d%H%M"})
+set_version("2.7.1", {build = "%Y%m%d%H%M"})
 
 set_warnings("all")
 
@@ -162,10 +162,19 @@ else
             serialization = true, --get_config("serialize"),
             system = true,
             python = false,
+            -- 以下为兼容 arrow 等其他组件
             thread = true,   -- parquet need
             chrono = true,   -- parquet need
             charconv = true, -- parquet need
-            cmake = false,
+            atomic = true,
+            container = true,
+            math = true,
+            locale = true,
+            icu = true,
+            regex = true,
+            random = true,
+            thread = true,
+            cmake = true,
     }}
 end
 
@@ -179,7 +188,7 @@ add_requires("nng", {system = false, configs = {NNG_ENABLE_TLS = has_config("htt
 add_requires("nlohmann_json", {system = false})
 add_requires("eigen", {system = false})
 add_requires("xxhash", {system = false})
-add_requires("utf8proc", {system = false})
+add_requires("utf8proc 2.11.0", {system = false})
 
 if has_config("http_client_zip") then
     add_requires("gzip-hpp", {system = false})
