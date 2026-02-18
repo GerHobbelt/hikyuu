@@ -53,11 +53,11 @@ static IndicatorList getAllIndicators(const Block& block, const KQuery& query,
     return ret;
 #else
     auto stks = block.getStockList();
-    return parallel_for_index(0, stks.size(),
-                              [nind = ind.clone(), fill_null, &stks, &query, &dates](size_t index) {
-                                  auto k = stks[index].getKData(query);
-                                  return ALIGN(nind, dates, fill_null)(k);
-                              });
+    return global_parallel_for_index(
+      0, stks.size(), [nind = ind.clone(), fill_null, &stks, &query, &dates](size_t index) {
+          auto k = stks[index].getKData(query);
+          return ALIGN(nind, dates, fill_null)(k);
+      });
 #endif
 }
 
@@ -225,7 +225,7 @@ static void insum_rank_asc(const IndicatorList& inds, Indicator::value_t* dst, c
 }
 
 void IInSum::_calculate(const Indicator& ind) {
-    Block block = getParam<Block>("block");
+    const Block block = getParam<const Block&>("block");
     bool ignore_context = getParam<bool>("ignore_context");
     const KData& k = getContext();
     KQuery q;

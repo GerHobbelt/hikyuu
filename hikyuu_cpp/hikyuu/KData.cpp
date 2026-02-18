@@ -44,6 +44,8 @@ string KData::toString() const {
 
 KData::KData() : m_imp(get_null_kdata_imp()) {}
 
+KData::KData(KDataImpPtr imp) : m_imp(imp ? imp : get_null_kdata_imp()) {}
+
 KData::KData(const Stock& stock, const KQuery& query) {
     // 在重加载或setKDateList时，已存在KData存在数据无效风险（但无内存访问问题)
     if (stock.isNull()) {
@@ -51,16 +53,18 @@ KData::KData(const Stock& stock, const KQuery& query) {
         return;
     }
 
-    if (stock.isPreload(query.kType()) && !stock.isBuffer(query.kType())) {
-        stock.loadKDataToBuffer(query.kType());
+    if (stock.isPreload(query.kType())) {
+        if (!stock.isBuffer(query.kType())) {
+            stock.loadKDataToBuffer(query.kType());
+        }
+        if (query.recoverType() == KQuery::NO_RECOVER) {
+            // 当Stock已缓存了该类型的K线数据，且不进行复权
+            m_imp = make_shared<KDataSharedBufferImp>(stock, query);
+            return;
+        }
     }
 
-    if (query.recoverType() == KQuery::NO_RECOVER && stock.isBuffer(query.kType())) {
-        // 当Stock已缓存了该类型的K线数据，且不进行复权
-        m_imp = make_shared<KDataSharedBufferImp>(stock, query);
-    } else {
-        m_imp = getKDataImp(stock, query);
-    }
+    m_imp = getKDataImp(stock, query);
 }
 
 bool KData::operator==(const KData& thr) const {
@@ -94,16 +98,41 @@ void KData::tocsv(const string& filename) {
 }
 
 KData KData::getKData(const Datetime& start, const Datetime& end) const {
+    const auto& self_query = getQuery();
+    return getKData(KQueryByDate(start, end, self_query.kType(), self_query.recoverType()));
+}
+
+KData KData::getKData(const KQuery& query) const {
     KData ret;
     const Stock& stk = getStock();
     HKU_IF_RETURN(stk.isNull(), ret);
 
-    const KQuery& query = getQuery();
-    ret = KData(stk, KQueryByDate(start, end, query.kType(), query.recoverType()));
+    if (stk.isPreload(query.kType())) {
+        if (!stk.isBuffer(query.kType())) {
+            stk.loadKDataToBuffer(query.kType());
+        }
+        ret = KData(stk, query);
+        return ret;
+    }
+
+    const auto& self_query = getQuery();
+    if (empty() || self_query.recoverType() != KQuery::NO_RECOVER ||
+        query.kType() != self_query.kType()) {
+        ret = KData(stk, query);
+        return ret;
+    }
+
+    if (query == self_query) {
+        ret.m_imp = m_imp;
+        return ret;
+    }
+
+    auto imp = m_imp->getOtherFromSelf(query);
+    ret.m_imp = std::move(imp);
     return ret;
 }
 
-KData KData::getKData(int64_t start, int64_t end) const {
+KData KData::getSubKData(int64_t start, int64_t end) const {
     int64_t total = static_cast<int64_t>(size());
     size_t startix, endix;
     if (start < 0) {

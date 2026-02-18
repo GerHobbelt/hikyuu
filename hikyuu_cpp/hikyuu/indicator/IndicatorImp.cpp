@@ -13,7 +13,6 @@
 #include "Indicator.h"
 #include "IndParam.h"
 #include "../Stock.h"
-#include "../GlobalInitializer.h"
 #include "imp/ICval.h"
 #include "imp/IContext.h"
 
@@ -24,7 +23,6 @@ BOOST_CLASS_EXPORT(hku::IndicatorImp)
 namespace hku {
 
 bool IndicatorImp::ms_enable_increment_calculate{true};
-ThreadPool *IndicatorImp::ms_tg = nullptr;
 
 string HKU_API getOPTypeName(IndicatorImp::OPType op) {
     string name;
@@ -102,28 +100,6 @@ string HKU_API getOPTypeName(IndicatorImp::OPType op) {
             break;
     }
     return name;
-}
-
-void IndicatorImp::initDynEngine() {
-    auto cpu_num = std::thread::hardware_concurrency();
-    if (cpu_num > 32) {
-        cpu_num = 32;
-    } else if (cpu_num >= 4) {
-        cpu_num -= 2;
-    } else if (cpu_num > 1) {
-        cpu_num--;
-    }
-    ms_tg = new ThreadPool(cpu_num);
-    HKU_CHECK(ms_tg, "Failed init indicator dynamic engine");
-}
-
-void IndicatorImp::releaseDynEngine() {
-    HKU_TRACE("releaseDynEngine");
-    if (ms_tg) {
-        ms_tg->stop();
-        delete ms_tg;
-        ms_tg = nullptr;
-    }
 }
 
 HKU_API std::ostream &operator<<(std::ostream &os, const IndicatorImp &imp) {
@@ -280,7 +256,8 @@ void IndicatorImp::setContext(const KData &k) {
         getAllSubNodes(nodes);
         if (ms_enable_increment_calculate) {
             for (const auto &node : nodes) {
-                if (!node->m_need_calculate && !node->supportIncrementCalculate()) {
+                if (!node->m_need_calculate && ((node->m_optype == LEAF || node->m_optype == OP) &&
+                                                !node->supportIncrementCalculate())) {
                     node->_clearBuffer();
                 }
             }
@@ -556,7 +533,7 @@ DatetimeList IndicatorImp::getDatetimeList() const {
 
 Datetime IndicatorImp::getDatetime(size_t pos) const {
     if (haveParam("align_date_list")) {
-        DatetimeList dates(getParam<DatetimeList>("align_date_list"));
+        const DatetimeList &dates = getParam<const DatetimeList &>("align_date_list");
         return pos < dates.size() ? dates[pos] : Null<Datetime>();
     }
     const KData &k = getContext();
@@ -570,7 +547,7 @@ IndicatorImp::value_t IndicatorImp::getByDate(Datetime date, size_t num) {
 
 size_t IndicatorImp::getPos(Datetime date) const {
     if (haveParam("align_date_list")) {
-        DatetimeList dates(getParam<DatetimeList>("align_date_list"));
+        const DatetimeList &dates(getParam<const DatetimeList &>("align_date_list"));
         auto iter = std::lower_bound(dates.begin(), dates.end(), date);
         if (iter != dates.end() && *iter == date) {
             return iter - dates.begin();
@@ -877,13 +854,13 @@ bool IndicatorImp::increment_execute_leaf_or_op(const Indicator &ind) {
         return false;
     }
 
-    for (size_t r = 0; r < m_result_num; ++r) {
-        if (m_pBuffer[r] == nullptr) {
-            return false;
+    if (copy_len > 0) {
+        for (size_t r = 0; r < m_result_num; ++r) {
+            HKU_ASSERT(m_pBuffer[r]);
+            m_pBuffer[r]->resize(total, Null<value_t>());
+            auto *dst = this->data(r);
+            memmove(dst, dst + copy_start_pos, sizeof(value_t) * (copy_len));
         }
-        m_pBuffer[r]->resize(total, Null<value_t>());
-        auto *dst = this->data(r);
-        memmove(dst, dst + copy_start_pos, sizeof(value_t) * (copy_len));
     }
 
     if (start_pos < m_discard) {
@@ -1054,35 +1031,13 @@ size_t IndicatorImp::increment_execute() {
         return null_pos;
     }
 
-    if (copy_start_pos < m_discard) {
-        size_t old_discard = m_discard;
-        m_discard = m_discard - copy_start_pos;
-        copy_start_pos = old_discard;
-        copy_len = m_old_context.size() - copy_start_pos;
-        for (size_t r = 0; r < m_result_num; ++r) {
-            if (m_pBuffer[r] == nullptr) {
-                return false;
-            }
-            m_pBuffer[r]->resize(total, Null<value_t>());
-            auto *dst = this->data(r);
-            memmove(dst + m_discard, dst + copy_start_pos, sizeof(value_t) * (copy_len));
-        }
-    } else {
-        for (size_t r = 0; r < m_result_num; ++r) {
-            if (m_pBuffer[r] == nullptr) {
-                return false;
-            }
-            m_pBuffer[r]->resize(total, Null<value_t>());
-            auto *dst = this->data(r);
-            memmove(dst, dst + copy_start_pos, sizeof(value_t) * (copy_len));
-        }
+    for (size_t r = 0; r < m_result_num; ++r) {
+        HKU_ASSERT(m_pBuffer[r] != nullptr);
+        m_pBuffer[r]->resize(total, Null<value_t>());
+        auto *dst = this->data(r);
+        memmove(dst, dst + copy_start_pos, sizeof(value_t) * (copy_len));
     }
 
-    if (start_pos < m_discard) {
-        start_pos = m_discard;
-    }
-
-    _update_discard();
     return start_pos;
 }
 
@@ -1846,35 +1801,13 @@ size_t IndicatorImp::increment_execute_if() {
         return null_pos;
     }
 
-    if (copy_start_pos < m_discard) {
-        size_t old_discard = m_discard;
-        m_discard = m_discard - copy_start_pos;
-        copy_start_pos = old_discard;
-        copy_len = m_old_context.size() - copy_start_pos;
-        for (size_t r = 0; r < m_result_num; ++r) {
-            if (m_pBuffer[r] == nullptr) {
-                return false;
-            }
-            m_pBuffer[r]->resize(total, Null<value_t>());
-            auto *dst = this->data(r);
-            memmove(dst + m_discard, dst + copy_start_pos, sizeof(value_t) * (copy_len));
-        }
-    } else {
-        for (size_t r = 0; r < m_result_num; ++r) {
-            if (m_pBuffer[r] == nullptr) {
-                return false;
-            }
-            m_pBuffer[r]->resize(total, Null<value_t>());
-            auto *dst = this->data(r);
-            memmove(dst, dst + copy_start_pos, sizeof(value_t) * (copy_len));
-        }
+    for (size_t r = 0; r < m_result_num; ++r) {
+        HKU_ASSERT(m_pBuffer[r]);
+        m_pBuffer[r]->resize(total, Null<value_t>());
+        auto *dst = this->data(r);
+        memmove(dst, dst + copy_start_pos, sizeof(value_t) * (copy_len));
     }
 
-    if (start_pos < m_discard) {
-        start_pos = m_discard;
-    }
-
-    _update_discard();
     return start_pos;
 }
 
@@ -1918,8 +1851,9 @@ void IndicatorImp::execute_if() {
     if (start_pos == Null<size_t>()) {
         size_t result_number = std::min(minp->getResultNumber(), maxp->getResultNumber());
         _readyBuffer(total, result_number);
-    } else if (start_pos > discard) {
-        discard = start_pos;
+        start_pos = discard;
+    } else if (start_pos < discard) {
+        start_pos = discard;
     }
 
     setDiscard(discard);
@@ -1929,7 +1863,7 @@ void IndicatorImp::execute_if() {
     auto *three = m_three->data(0);
     for (size_t r = 0; r < m_result_num; ++r) {
         auto *dst = this->data(r);
-        for (size_t i = discard; i < total; ++i) {
+        for (size_t i = start_pos; i < total; ++i) {
             if (three[i - diff_cond] > 0.0) {
                 dst[i] = left[i - diff_left];
             } else {
@@ -1951,10 +1885,8 @@ void IndicatorImp::_dyn_calculate(const Indicator &ind) {
 
     const value_t *param_data = ind_param->data();
 
-    static const size_t minCircleLength = 400;
-    size_t workerNum = ms_tg->worker_num();
-    if (total < minCircleLength || isSerial() || workerNum == 1) {
-        // HKU_INFO("single_thread");
+    static constexpr size_t minCircleLength = 400;
+    if (total < minCircleLength || isSerial()) {
         for (size_t i = ind.discard(); i < total; i++) {
             if (std::isnan(param_data[i])) {
                 _set(Null<value_t>(), i);
@@ -1967,39 +1899,17 @@ void IndicatorImp::_dyn_calculate(const Indicator &ind) {
         return;
     }
 
-    // HKU_INFO("multi_thread");
-    size_t circleLength = minCircleLength;
-    if (minCircleLength * workerNum < total) {
-        size_t tailCount = total % workerNum;
-        circleLength = tailCount == 0 ? total / workerNum : total / workerNum + 1;
-    }
-
-    std::vector<std::future<void>> tasks;
-    for (size_t group = 0; group < workerNum; group++) {
-        size_t first = circleLength * group;
-        if (first >= total) {
-            break;
-        }
-        tasks.push_back(
-          ms_tg->submit([this, &ind, first, circleLength, total, group, param_data]() {
-              size_t endPos = first + circleLength;
-              if (endPos > total) {
-                  endPos = total;
-              }
-              for (size_t i = circleLength * group; i < endPos; i++) {
-                  if (std::isnan(param_data[i])) {
-                      _set(Null<value_t>(), i);
-                  } else {
-                      size_t step = size_t(param_data[i]);
-                      _dyn_run_one_step(ind, i, step);
-                  }
-              }
-          }));
-    }
-
-    for (auto &task : tasks) {
-        task.get();
-    }
+    global_parallel_for_index_void(
+      ind.discard(), total,
+      [&ind, param_data, this](size_t i) {
+          if (std::isnan(param_data[i])) {
+              _set(Null<value_t>(), i);
+          } else {
+              size_t step = size_t(param_data[i]);
+              _dyn_run_one_step(ind, i, step);
+          }
+      },
+      minCircleLength);
 
     _update_discard();
 }

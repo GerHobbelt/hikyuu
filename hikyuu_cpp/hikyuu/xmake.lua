@@ -2,6 +2,10 @@
 target("hikyuu")
     set_kind("$(kind)")
 
+    if is_mode("coverage") then 
+        add_cxflags("-fprofile-update=atomic")
+    end
+
     if get_config("leak_check") then
         if is_plat("macosx") then
             set_policy("build.sanitizer.address", true)
@@ -14,15 +18,18 @@ target("hikyuu")
         end
     end
 
-    add_packages("boost", "fmt", "spdlog", "flatbuffers", "nng", "nlohmann_json", "xxhash", "eigen", "openmp")
+    add_packages("boost", "fmt", "spdlog", "flatbuffers", "nng", "nlohmann_json", "xxhash", "eigen")
     if is_plat("windows", "linux", "cross", "macosx") then
         if get_config("sqlite") or get_config("hdf5") then
             add_packages("sqlite3")
         end
     end
 
-    if is_plat("macosx") then
-        add_packages("libomp")
+    if has_config("omp") then 
+        add_packages("openmp")
+        if is_plat("macosx") then
+            add_packages("libomp")
+        end
     end
 
     if has_config("http_client_zip") then
@@ -76,6 +83,12 @@ target("hikyuu")
     end
 
     if is_plat("macosx") then
+        -- macosx下boost序列化需要
+        if is_kind("shared") then 
+            add_defines("HKU_API=__attribute__((visibility(\"default\")))")
+            add_defines("HKU_UTILS_API=__attribute__((visibility(\"default\")))")
+        end
+        add_cxflags("-frtti")
         add_links("sqlite3")
         add_frameworks("CoreFoundation")
     end

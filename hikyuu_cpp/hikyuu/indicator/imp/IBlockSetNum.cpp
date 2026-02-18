@@ -35,14 +35,14 @@ void IBlockSetNum::_checkParam(const string& name) const {
 }
 
 void IBlockSetNum::_calculate(const Indicator& ind) {
-    Block block = getParam<Block>("block");
+    const Block block = getParam<const Block&>("block");
     bool ignore_context = getParam<bool>("ignore_context");
     const KData& k = getContext();
     DatetimeList dates;
     if (!ignore_context && !k.empty()) {
         dates = k.getDatetimeList();
     } else {
-        KQuery q = getParam<KQuery>("query");
+        const KQuery& q = getParam<const KQuery&>("query");
         if (q != KQuery(0, 0)) {
             dates = StockManager::instance().getTradingCalendar(q, getParam<string>("market"));
         }
@@ -63,6 +63,34 @@ void IBlockSetNum::_calculate(const Indicator& ind) {
         const Datetime& start_date = iter->startDatetime();
         Datetime last_date = iter->lastDatetime().isNull() ? Datetime::max() : iter->lastDatetime();
         for (size_t i = 0; i < total; i++) {
+            if (dates[i] >= start_date && dates[i] <= last_date) {
+                dst[i]++;
+            }
+        }
+    }
+}
+
+bool IBlockSetNum::supportIncrementCalculate() const {
+    return !getParam<bool>("ignore_context");
+}
+
+void IBlockSetNum::_increment_calculate(const Indicator& ind, size_t start_pos) {
+    const Block block = getParam<const Block&>("block");
+    const KData& k = getContext();
+    DatetimeList dates = k.getDatetimeList();
+
+    size_t total = dates.size();
+
+    value_t zero = 0.0;
+    auto* dst = this->data();
+    for (size_t i = start_pos; i < total; i++) {
+        dst[i] = zero;
+    }
+
+    for (auto iter = block.begin(); iter != block.end(); ++iter) {
+        const Datetime& start_date = iter->startDatetime();
+        Datetime last_date = iter->lastDatetime().isNull() ? Datetime::max() : iter->lastDatetime();
+        for (size_t i = start_pos; i < total; i++) {
             if (dates[i] >= start_date && dates[i] <= last_date) {
                 dst[i]++;
             }

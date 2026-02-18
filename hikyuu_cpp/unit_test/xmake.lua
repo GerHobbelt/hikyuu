@@ -18,12 +18,12 @@ function coverage_report(target)
         os.run("lcov -c -d ./ -o cover.info")
 
         -- 合并基准数据和执行测试文件后生成的覆盖率数据
-        os.exec("lcov --ignore-errors empty -a cover-init.info -a cover.info -o cover-total.info")
+        os.exec("lcov --ignore-errors empty --rc geninfo_unexecuted_blocks=1 -a cover-init.info -a cover.info -o cover-total.info")
 
         -- 删除统计信息中如下的代码或文件，支持正则
         os.exec("lcov --ignore-errors unused --remove cover-total.info '*/usr/include/*' \
                 '*/usr/lib/*' '*/usr/local/include/*' '*/usr/local/lib/*' '*/usr/local/lib64/*' \
-                '*/.xmake*' '*/boost/*' '*/ffmpeg/*' \
+                '*/.xmake*' '*/boost/*' \
                 'unit_test/*' 'hikyuu/data_driver/*' 'hikyuu/global/*' 'hikyuu/plugin/*' 'hikyuu/utilities/*' \
                 -o cover-final.info")
         
@@ -54,6 +54,10 @@ end
 target("unit-test")
     set_kind("binary")
     set_default(false)
+
+    if is_mode("coverage") then 
+        add_cxflags("-fprofile-update=atomic")
+    end    
 
     if get_config("leak_check") then
         if is_plat("macosx") then
@@ -95,6 +99,12 @@ target("unit-test")
     if is_plat("linux") or is_plat("macosx") then
         add_links("sqlite3")
         add_shflags("-Wl,-rpath=$ORIGIN", "-Wl,-rpath=$ORIGIN/../lib")
+    end
+
+    if is_plat("macosx") then
+        -- boost序列化需要
+        add_cxflags("-frtti -fvisibility=default")
+        add_ldflags("-Wl,-flat_namespace,-undefined,dynamic_lookup")
     end
 
     -- set_policy("build.optimization.lto", true)

@@ -371,11 +371,11 @@ def import_one_stock_data(
                     hku_error(
                         f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord close: {last_krecord[4]}, bar: {bar['close']}")
                     return (0, False, Datetime(last_datetime))
-                if ktype == 'DAY' and last_krecord[5] != 0.0 and abs(last_krecord[5] - bar["amount"]*0.001) > 10:
+                if ktype == 'DAY' and last_krecord[5] != 0.0 and abs(last_krecord[5] - bar["amount"]*0.001) > 10000:
                     hku_error(
                         f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord amount: {last_krecord[5]}, bar: {bar['amount']*0.001}")
                     return (0, False, Datetime(last_datetime))
-                if ktype == 'DAY' and last_krecord[6] != 0.0 and abs(last_krecord[6] - bar["vol"]) > 10:
+                if ktype == 'DAY' and last_krecord[6] != 0.0 and abs(last_krecord[6] - bar["vol"]) > 10000:
                     hku_error(
                         f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord count: {last_krecord[6]}, bar: {bar['vol']}")
                     return (0, False, Datetime(last_datetime))
@@ -523,11 +523,11 @@ def import_data(
             '5MIN': 'MIN5'
         }
         nktype = ktype_dict[ktype]
-        h5_importer = get_mysql_importer(market, nktype)
-        if h5_importer is not None:
+        importer = get_mysql_importer()
+        if importer is not None:
             for r in failed_list:
                 hku_warn("remove {}{} {}: {}", r[0], r[1], nktype, r[2].start_of_day())
-                h5_importer.remove(r[0], r[1], nktype, r[2].start_of_day())
+                importer.remove(r[0], r[1], nktype, r[2].start_of_day())
             hku_warn(f"已清理 {market} {failed_count} 个失败股票的最后记录，建议重新导入")
 
     if failed_count >= failed_limit:

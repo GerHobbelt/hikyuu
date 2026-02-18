@@ -24,6 +24,7 @@ public:
     KData();
     KData(const KData&);
     KData(const Stock& stock, const KQuery& query);
+    explicit KData(KDataImpPtr imp);
     virtual ~KData() {}
 
     KData& operator=(const KData&);
@@ -33,8 +34,8 @@ public:
     KData(KData&&);
     KData& operator=(KData&&);
 
-    size_t size() const;
-    bool empty() const;
+    size_t size() const noexcept;
+    bool empty() const noexcept;
 
     bool operator==(const KData&) const;
     bool operator!=(const KData&) const;
@@ -42,13 +43,13 @@ public:
     DatetimeList getDatetimeList() const;
 
     /** 获取指定位置的KRecord，未作越界检查 */
-    const KRecord& getKRecord(size_t pos) const;
+    const KRecord& getKRecord(size_t pos) const noexcept;
 
     /** 按日期查询KRecord */
-    const KRecord& getKRecord(Datetime datetime) const;
+    const KRecord& getKRecord(Datetime datetime) const noexcept;
 
     /** 同getKRecord @see getKRecord */
-    const KRecord& operator[](size_t pos) const {
+    const KRecord& operator[](size_t pos) const noexcept {
         return getKRecord(pos);
     }
 
@@ -68,6 +69,8 @@ public:
      */
     KData getKData(const Datetime& start, const Datetime& end) const;
 
+    KData getKData(const KQuery& query) const;
+
     /**
      * 获取相同时间范围内的其他类型K线数据，如日线下对应的分钟线数据
      * @param ktype
@@ -81,7 +84,7 @@ public:
      * @param end 结束索引
      * @return KData
      */
-    KData getKData(int64_t start, int64_t end = Null<int64_t>()) const;
+    KData getSubKData(int64_t start, int64_t end = Null<int64_t>()) const;
 
     /**
      * 特殊用途！谨慎！按当前K线范围，获取指定日期范围的其他类型的按日期查询的 Query 条件
@@ -99,7 +102,7 @@ public:
                                const KQuery::KType& ktype) const;
 
     /** 按日期查询对应的索引位置，注：是 KData 中的位置，不是在 Stock 中原始K记录的位置 */
-    size_t getPos(const Datetime& datetime) const;
+    size_t getPos(const Datetime& datetime) const noexcept;
 
     /** 按日期获取在原始 K 线记录中的位置 */
     size_t getPosInStock(Datetime datetime) const;
@@ -143,8 +146,10 @@ public:
     Indicator amo() const;
 
 public:
-    const KRecord* data() const;
-    KRecord* data();  // 谨慎使用（用于强制调整数据）
+    const KRecord* data() const noexcept;
+    KRecord* data() noexcept;  // 谨慎使用（用于强制调整数据）
+
+    KDataImpPtr getImp() const noexcept;
 
     // 常量迭代器定义
     class const_iterator {
@@ -272,15 +277,13 @@ inline KData::KData(KData&& x) : m_imp(std::move(x.m_imp)) {
 }
 
 inline KData& KData::operator=(const KData& x) {
-    if (this == &x)
-        return *this;
+    HKU_IF_RETURN(this == &x, *this);
     m_imp = x.m_imp;
     return *this;
 }
 
 inline KData& KData::operator=(KData&& x) {
-    if (this == &x)
-        return *this;
+    HKU_IF_RETURN(this == &x, *this);
     m_imp = std::move(x.m_imp);
     x.m_imp = get_null_kdata_imp();
     return *this;
@@ -290,24 +293,24 @@ inline DatetimeList KData::getDatetimeList() const {
     return m_imp->getDatetimeList();
 }
 
-inline const KRecord& KData::getKRecord(size_t pos) const {
+inline const KRecord& KData::getKRecord(size_t pos) const noexcept {
     return m_imp->getKRecord(pos);  // 不会抛出异常
 }
 
-inline const KRecord& KData::getKRecord(Datetime datetime) const {
+inline const KRecord& KData::getKRecord(Datetime datetime) const noexcept {
     size_t pos = getPos(datetime);
     return pos != Null<size_t>() ? getKRecord(pos) : KRecord::NullKRecord;
 }
 
-inline size_t KData::getPos(const Datetime& datetime) const {
+inline size_t KData::getPos(const Datetime& datetime) const noexcept {
     return m_imp->getPos(datetime);
 }
 
-inline size_t KData::size() const {
+inline size_t KData::size() const noexcept {
     return m_imp->size();
 }
 
-inline bool KData::empty() const {
+inline bool KData::empty() const noexcept {
     return m_imp->empty();
 }
 
@@ -343,12 +346,16 @@ inline bool KData::operator!=(const KData& other) const {
     return !(*this == other);
 }
 
-inline const KRecord* KData::data() const {
+inline const KRecord* KData::data() const noexcept {
     return m_imp->data();
 }
 
-inline KRecord* KData::data() {
+inline KRecord* KData::data() noexcept {
     return m_imp->data();
+}
+
+inline KDataImpPtr KData::getImp() const noexcept {
+    return m_imp;
 }
 
 } /* namespace hku */

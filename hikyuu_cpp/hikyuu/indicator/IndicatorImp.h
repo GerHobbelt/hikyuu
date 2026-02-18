@@ -309,7 +309,6 @@ public:
 
 protected:
     static bool ms_enable_increment_calculate;
-    static ThreadPool* ms_tg;
 
 #if HKU_SUPPORT_SERIALIZATION
 private:
@@ -407,10 +406,6 @@ private:
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 #endif
 };
-
-#if HKU_SUPPORT_SERIALIZATION
-BOOST_SERIALIZATION_ASSUME_ABSTRACT(IndicatorImp)
-#endif
 
 #if HKU_SUPPORT_SERIALIZATION
 #define INDICATOR_IMP_NO_PRIVATE_MEMBER_SERIALIZATION          \

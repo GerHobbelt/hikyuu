@@ -138,7 +138,8 @@ Stock::~Stock() {}
 
 Stock::Stock(const Stock& x) : m_data(x.m_data), m_kdataDriver(x.m_kdataDriver) {}
 
-Stock::Stock(Stock&& x) : m_data(std::move(x.m_data)), m_kdataDriver(std::move(x.m_kdataDriver)) {}
+Stock::Stock(Stock&& x) noexcept
+: m_data(std::move(x.m_data)), m_kdataDriver(std::move(x.m_kdataDriver)) {}
 
 Stock& Stock::operator=(const Stock& x) {
     HKU_IF_RETURN(this == &x, *this);
@@ -147,7 +148,7 @@ Stock& Stock::operator=(const Stock& x) {
     return *this;
 }
 
-Stock& Stock::operator=(Stock&& x) {
+Stock& Stock::operator=(Stock&& x) noexcept {
     HKU_IF_RETURN(this == &x, *this);
     m_data = std::move(x.m_data);
     m_kdataDriver = std::move(x.m_kdataDriver);
@@ -179,63 +180,63 @@ bool Stock::operator==(const Stock& stock) const {
             (m_data->m_market == stock.m_data->m_market));
 }
 
-const string& Stock::market() const {
+const string& Stock::market() const noexcept {
     return m_data ? m_data->m_market : default_market;
 }
 
-const string& Stock::code() const {
+const string& Stock::code() const noexcept {
     return m_data ? m_data->m_code : default_code;
 }
 
-const string& Stock::market_code() const {
+const string& Stock::market_code() const noexcept {
     return m_data ? m_data->m_market_code : default_market_code;
 }
 
-const string& Stock::name() const {
+const string& Stock::name() const noexcept {
     return m_data ? m_data->m_name : default_name;
 }
 
-uint32_t Stock::type() const {
+uint32_t Stock::type() const noexcept {
     return m_data ? m_data->m_type : default_type;
 }
 
-bool Stock::valid() const {
+bool Stock::valid() const noexcept {
     return m_data ? m_data->m_valid : default_valid;
 }
 
-const Datetime& Stock::startDatetime() const {
+const Datetime& Stock::startDatetime() const noexcept {
     return m_data ? m_data->m_startDate : default_startDate;
 }
 
-const Datetime& Stock::lastDatetime() const {
+const Datetime& Stock::lastDatetime() const noexcept {
     return m_data ? m_data->m_lastDate : default_lastDate;
 }
 
-price_t Stock::tick() const {
+price_t Stock::tick() const noexcept {
     return m_data ? m_data->m_tick : default_tick;
 }
 
-price_t Stock::tickValue() const {
+price_t Stock::tickValue() const noexcept {
     return m_data ? m_data->m_tickValue : default_tickValue;
 }
 
-price_t Stock::unit() const {
+price_t Stock::unit() const noexcept {
     return m_data ? m_data->m_unit : default_unit;
 }
 
-int Stock::precision() const {
+int Stock::precision() const noexcept {
     return m_data ? m_data->m_precision : default_precision;
 }
 
-double Stock::atom() const {
+double Stock::atom() const noexcept {
     return m_data ? m_data->m_minTradeNumber : default_minTradeNumber;
 }
 
-double Stock::minTradeNumber() const {
+double Stock::minTradeNumber() const noexcept {
     return m_data ? m_data->m_minTradeNumber : default_minTradeNumber;
 }
 
-double Stock::maxTradeNumber() const {
+double Stock::maxTradeNumber() const noexcept {
     return m_data ? m_data->m_maxTradeNumber : default_maxTradeNumber;
 }
 
@@ -402,13 +403,6 @@ KDataDriverConnectPoolPtr Stock::getKDataDirver() const {
     return m_kdataDriver;
 }
 
-void Stock::setWeightList(const StockWeightList& weightList) {
-    if (m_data) {
-        std::lock_guard<std::mutex> lock(m_data->m_weight_mutex);
-        m_data->m_weightList = weightList;
-    }
-}
-
 bool Stock::isBuffer(KQuery::KType ktype) const {
     HKU_IF_RETURN(!m_data, false);
     string nktype(ktype);
@@ -451,7 +445,7 @@ void Stock::releaseKDataBuffer(KQuery::KType inkType) const {
 
     // 同时释放掉历史财务信息，以便重加载时获取最新数据
     {
-        std::lock_guard<std::mutex> lock(m_data->m_history_finance_mutex);
+        std::unique_lock<std::shared_mutex> lock(m_data->m_history_finance_mutex);
         m_data->m_history_finance_ready = false;
         m_data->m_history_finance.clear();
     }
@@ -506,6 +500,7 @@ void Stock::loadKDataToBuffer(KQuery::KType inkType) const {
         m_data->pKData[kType] = ptr_klist;
         if (total != 0) {
             (*ptr_klist) = driver->getKRecordList(m_data->m_market, m_data->m_code, query);
+            ptr_klist->shrink_to_fit();
             if ((kType == KQuery::TIMELINE || kType == KQuery::TRANS) &&
                 (type() == STOCKTYPE_ETF || type() == STOCKTYPE_FUND || type() == STOCKTYPE_B)) {
                 for (auto& k : *ptr_klist) {
@@ -532,6 +527,7 @@ void Stock::loadKDataToBufferFromKRecordList(const KQuery::KType& inkType, KReco
         }
         KRecordList* ptr_klist = new KRecordList;
         (*ptr_klist) = std::move(ks);
+        ptr_klist->shrink_to_fit();
         m_data->pKData[kType] = ptr_klist;
         m_data->m_lastUpdate[kType] = Datetime::now();
     }
@@ -540,7 +536,7 @@ void Stock::loadKDataToBufferFromKRecordList(const KQuery::KType& inkType, KReco
 StockWeightList Stock::getWeight(const Datetime& start, const Datetime& end) const {
     StockWeightList result;
     HKU_IF_RETURN(!m_data || start >= end, result);
-    std::lock_guard<std::mutex> lock(m_data->m_weight_mutex);
+    std::shared_lock<std::shared_mutex> lock(m_data->m_weight_mutex);
     StockWeightList::const_iterator start_iter, end_iter;
     start_iter = lower_bound(m_data->m_weightList.begin(), m_data->m_weightList.end(),
                              StockWeight(start), std::less<StockWeight>());
@@ -986,6 +982,7 @@ KRecordList Stock::_getKRecordList(const KQuery& query) const {
             result = m_kdataDriver->getConnect()->getKRecordList(
               m_data->m_market, m_data->m_code, KQuery(start_ix, end_ix, query.kType()));
         }
+        result.shrink_to_fit();
         if ((query.kType() == KQuery::TIMELINE || query.kType() == KQuery::TRANS) &&
             (type() == STOCKTYPE_ETF || type() == STOCKTYPE_FUND || type() == STOCKTYPE_B)) {
             for (auto& k : result) {
@@ -1202,19 +1199,26 @@ void Stock::setKRecordList(KRecordList&& ks, const KQuery::KType& ktype) {
 
 const vector<HistoryFinanceInfo>& Stock::getHistoryFinance() const {
     HKU_ASSERT(m_data);
-    std::lock_guard<std::mutex> lock(m_data->m_history_finance_mutex);
     if (!m_data->m_history_finance_ready) {
+        // 目前 m_history_finance_ready 和 m_history_finance_mutex
+        // 分离，并行时短时间可能造成多次获取，可以容忍
+        std::unique_lock<std::shared_mutex> lock(m_data->m_history_finance_mutex);
         m_data->m_history_finance =
           StockManager::instance().getHistoryFinance(*this, Datetime::min(), Null<Datetime>());
+        m_data->m_history_finance.shrink_to_fit();
         m_data->m_history_finance_ready = true;
+        return m_data->m_history_finance;
+    } else {
+        std::shared_lock<std::shared_mutex> lock(m_data->m_history_finance_mutex);
+        return m_data->m_history_finance;
     }
-    return m_data->m_history_finance;
 }
 
 void Stock::setHistoryFinance(vector<HistoryFinanceInfo>&& history_finance) {
     HKU_IF_RETURN(!m_data, void());
-    std::lock_guard<std::mutex> lock(m_data->m_history_finance_mutex);
+    history_finance.shrink_to_fit();
     if (!m_data->m_history_finance_ready) {
+        std::unique_lock<std::shared_mutex> lock(m_data->m_history_finance_mutex);
         m_data->m_history_finance = std::move(history_finance);
         m_data->m_history_finance_ready = true;
     }
