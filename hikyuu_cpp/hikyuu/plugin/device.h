@@ -12,6 +12,13 @@
 namespace hku {
 
 /**
+ * @brief 绑定授权码
+ * @param email 邮箱
+ * @param active_code 授权码
+ */
+void HKU_API bindEmail(const std::string& email, const std::string& active_code);
+
+/**
  * @brief 激活设备
  * @param active_code 授权码
  * @param replace 超过设备限制时，强制替换最早激活的设备
@@ -29,5 +36,8 @@ std::string HKU_API fetchTrialLicense(const std::string& email);
 
 /** 检查授权是否有效 */
 bool HKU_API isValidLicense();
+
+/** 获取授权到期时间 */
+Datetime HKU_API getExpireDate();
 
 }  // namespace hku
