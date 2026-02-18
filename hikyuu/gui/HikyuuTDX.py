@@ -35,7 +35,7 @@ from hikyuu.gui.data.CollectSpotThread import CollectSpotThread
 from hikyuu.gui.data.SchedImportThread import SchedImportThread
 from hikyuu.gui.spot_server import release_nng_senders
 
-from hikyuu import (can_upgrade, get_last_version, fetch_trial_license,
+from hikyuu import (can_upgrade, get_latest_version_info, fetch_trial_license,
                     view_license, is_valid_license, get_expire_date, Datetime, TimeDelta)
 from hikyuu.data import hku_config_template
 from hikyuu.util import *
@@ -124,6 +124,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
                 f.write(
                     hku_config_template.hdf5_template.format(
                         dir=data_dir, reload_time=old_reload_time,
+                        lazy_preload=current_config.getboolean('lazy_preload', 'enable', fallback=False),
                         quotation_server=current_config.get(
                             'collect', 'quotation_server', fallback='ipc:///tmp/hikyuu_real.ipc'),
                         day=current_config.getboolean('preload', 'day', fallback=True),
@@ -165,6 +166,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
                     hku_config_template.mysql_template.format(
                         dir=data_dir,
                         reload_time=old_reload_time,
+                        lazy_preload=current_config.getboolean('lazy_preload', 'enable', fallback=False),
                         quotation_server=current_config.get(
                             'collect', 'quotation_server', fallback='ipc:///tmp/hikyuu_real.ipc'),
                         host=current_config['mysql']['host'],
@@ -209,6 +211,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
                     hku_config_template.clickhouse_template.format(
                         dir=data_dir,
                         reload_time=old_reload_time,
+                        lazy_preload=current_config.getboolean('lazy_preload', 'enable', fallback=False),
                         quotation_server=current_config.get(
                             'collect', 'quotation_server', fallback='ipc:///tmp/hikyuu_real.ipc'),
                         host=current_config['clickhouse']['host'],
@@ -512,6 +515,8 @@ li.checked::marker { content: "\2612"; }
         )
 
         # 预加载设置
+        self.lazy_checkBox.setChecked(import_config.getboolean('lazy_preload', 'enable', fallback=False))
+        self.lazy_checkBox.setEnabled(is_valid_license())
         self.preload_day_checkBox.setChecked(import_config.getboolean('preload', 'day', fallback=True))
         self.preload_week_checkBox.setChecked(import_config.getboolean('preload', 'week', fallback=False))
         self.preload_month_checkBox.setChecked(import_config.getboolean('preload', 'month', fallback=False))
@@ -604,6 +609,9 @@ li.checked::marker { content: "\2612"; }
             'phase1_end': self.collect_phase1_last_timeEdit.time().toString(),
             'phase2_start': self.collect_phase2_start_timeEdit.time().toString(),
             'phase2_end': self.collect_phase2_last_timeEdit.time().toString(),
+        }
+        import_config['lazy_preload'] = {
+            'enable': self.lazy_checkBox.isChecked(),
         }
         import_config['preload'] = {
             'day': self.preload_day_checkBox.isChecked(),
@@ -872,10 +880,12 @@ li.checked::marker { content: "\2612"; }
                 self.import_detail_textEdit.append("导入完毕！")
                 self.hdf5_weight_label.setText("导入完毕!")
                 if can_upgrade():
+                    release_info = get_latest_version_info()
                     self.import_detail_textEdit.append("========================================================")
                     self.import_detail_textEdit.append(
-                        "Hikyuu 新版本 ({}) 已发布，建议更新".format(get_last_version()))
+                        "Hikyuu 新版本 ({}) 已发布，建议更新".format(release_info['version']))
                     self.import_detail_textEdit.append("更新命令: pip instal hikyuu --upgrade")
+                    self.import_detail_textEdit.append(f'{release_info["remark"]}')
                     self.import_detail_textEdit.append("========================================================")
                 if is_valid_license():
                     expire_date = get_expire_date()

@@ -66,6 +66,8 @@ void GlobalInitializer::init() {
         initLogger();
     }
 
+    sysinfo_init();
+
 #if HKU_ENABLE_SEND_FEEDBACK
     sendFeedback();
 #endif
@@ -83,13 +85,15 @@ void GlobalInitializer::init() {
 void GlobalInitializer::clean() {
 #if HKU_ENABLE_SEND_FEEDBACK
     if (runningInPython() && CanUpgrade()) {
+        LatestVersionInfo info = getLatestVersionInfo();
         fmt::print(
           "\n====================================================================\n"
           "The new version of Hikyuu is {}, and you can run the upgrade command:\n"
           "Hikyuu 的最新版本是 {}, 您可以运行升级命令:\n"
           "pip install hikyuu --upgrade\n"
-          "========================================================\n\n",
-          getLatestVersion(), getLatestVersion());
+          "{}\n"
+          "====================================================================\n\n",
+          info.version, info.version, info.remark);
     }
 #endif
 
@@ -103,14 +107,9 @@ void GlobalInitializer::clean() {
     }
 #endif
 
+    sysinfo_clean();
     releaseScheduler();
-
-#if !HKU_OS_WINDOWS
-    // windows 反而会卡死
-    nng_fini();
-#endif
     releaseGlobalSpotAgent();
-
     IndicatorImp::releaseDynEngine();
 
 #if !HKU_OS_OSX
@@ -121,10 +120,6 @@ void GlobalInitializer::clean() {
     }
 #endif
 
-#if HKU_ENABLE_TA_LIB
-    TA_Shutdown();
-#endif
-
 #if HKU_ENABLE_LEAK_DETECT || defined(MSVC_LEAKER_DETECT)
     // 非内存泄漏检测时，内存让系统自动释放，避免某些场景下 windows 下退出速度过慢
     StockManager::quit();
@@ -133,6 +128,15 @@ void GlobalInitializer::clean() {
 #endif
 
     DataDriverFactory::release();
+
+#if HKU_ENABLE_TA_LIB
+    TA_Shutdown();
+#endif
+
+#if !HKU_OS_WINDOWS
+    // windows 反而会卡死
+    nng_fini();
+#endif
 
 #if HKU_ENABLE_HDF5_KDATA
     H5close();

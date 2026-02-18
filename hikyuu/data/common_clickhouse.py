@@ -69,11 +69,9 @@ def create_database(connect):
              and int(x.stem) > db_version and not x.is_dir()]
     files.sort()
     for file in files:
-        print(file)
         sql = file.read_text(encoding='utf8')
         statements = sql.split(';')
         for stmt in statements:
-            print(stmt)
             stmt = stmt.strip()
             if stmt:  # 跳过空语句
                 try:
@@ -163,7 +161,7 @@ def get_last_krecord(connect, tablename):
         # hku_info(f"{tablename} {a}")
         if not a:
             return None
-        return (Datetime.from_timestamp_utc(a[0][0]*1000000).ymdhm, a[0][1]*0.001, a[0][2]*0.001, a[0][3]*0.001, a[0][4]*0.001, a[0][5], a[0][6]*0.001)
+        return (Datetime.from_timestamp_utc(a[0][0]*1000000).ymdhm, a[0][1]*0.001, a[0][2]*0.001, a[0][3]*0.001, a[0][4]*0.001, float(a[0][5]), a[0][6]*0.001)
     except:
         return None
 

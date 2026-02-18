@@ -110,7 +110,7 @@ void StockManager::init(const Parameter& baseInfoParam, const Parameter& blockPa
         m_plugin_manager.pluginPath(m_hikyuuParam.tryGet<string>(
           "plugindir", fmt::format("{}/.hikyuu/plugin", getUserDir())));
     }
-    HKU_INFO("Plugin path: {}", getPluginPath());
+    HKU_INFO(htr("Plugin path: {}", getPluginPath()));
 
     // 注册扩展K线处理
     registerPredefinedExtraKType();
@@ -119,9 +119,9 @@ void StockManager::init(const Parameter& baseInfoParam, const Parameter& blockPa
     to_lower(basedrivername);
     if (basedrivername == "clickhouse") {
         auto* plugin = getPlugin<DataDriverPluginInterface>(HKU_PLUGIN_CLICKHOUSE_DRIVER);
-        HKU_CHECK(plugin, "Can not find {} plugin!", HKU_PLUGIN_CLICKHOUSE_DRIVER);
+        HKU_CHECK(plugin, htr("Can not find {} plugin!", HKU_PLUGIN_CLICKHOUSE_DRIVER));
         auto driver = plugin->getBaseInfoDriver();
-        HKU_CHECK(driver, "Can not get clickhouse driver! Check your license!");
+        HKU_CHECK(driver, htr("Can not get clickhouse driver! Check your license!"));
         DataDriverFactory::regBaseInfoDriver(driver);
     }
 
@@ -129,7 +129,7 @@ void StockManager::init(const Parameter& baseInfoParam, const Parameter& blockPa
     to_lower(kdrivername);
     if (kdrivername == "clickhouse") {
         auto* plugin = getPlugin<DataDriverPluginInterface>(HKU_PLUGIN_CLICKHOUSE_DRIVER);
-        HKU_CHECK(plugin, "Can not find {} plugin!", HKU_PLUGIN_CLICKHOUSE_DRIVER);
+        HKU_CHECK(plugin, htr("Can not find {} plugin!", HKU_PLUGIN_CLICKHOUSE_DRIVER));
         auto kdriver = plugin->getKDataDriver();
         HKU_CHECK(kdriver, htr("Can not get clickhouse driver! Check your license!"));
         DataDriverFactory::regKDataDriver(kdriver);
@@ -139,9 +139,9 @@ void StockManager::init(const Parameter& baseInfoParam, const Parameter& blockPa
     to_lower(blockdrivername);
     if (blockdrivername == "clickhouse") {
         auto* plugin = getPlugin<DataDriverPluginInterface>(HKU_PLUGIN_CLICKHOUSE_DRIVER);
-        HKU_CHECK(plugin, "Can not find {} plugin!", HKU_PLUGIN_CLICKHOUSE_DRIVER);
+        HKU_CHECK(plugin, htr("Can not find {} plugin!", HKU_PLUGIN_CLICKHOUSE_DRIVER));
         auto driver = plugin->getBlockInfoDriver();
-        HKU_CHECK(driver, "Can not get clickhouse driver! Check your license!");
+        HKU_CHECK(driver, htr("Can not get clickhouse driver! Check your license!"));
         DataDriverFactory::regBlockDriver(driver);
     }
 
@@ -223,20 +223,38 @@ void StockManager::loadAllKData() {
         string preload_key = fmt::format("{}_max", back);
         auto context_iter = context_preload_num.find(preload_key);
         if (context_iter != context_preload_num.end()) {
-            m_preloadParam.set<int>(preload_key, context_iter->second);
+            m_preloadParam.set<int64_t>(preload_key, context_iter->second);
         }
 
-        int preload_max_num = m_preloadParam.tryGet<int>(preload_key, 0);
-        HKU_INFO_IF(m_preloadParam.tryGet<bool>(back, false),
-                    htr("Preloading {} kdata to buffer (max: {})!", back, preload_max_num));
+        int64_t preload_max_num = m_preloadParam.tryGet<int64_t>(preload_key, 0);
+        if (preload_max_num <= 0) {
+            preload_max_num = std::numeric_limits<int64_t>::max();
+            m_preloadParam.set<int64_t>(preload_key, preload_max_num);
+            HKU_INFO_IF(m_preloadParam.tryGet<bool>(back, false),
+                        htr("Preloading {} kdata to buffer (max: no limit)!", back));
+        } else {
+            HKU_INFO_IF(m_preloadParam.tryGet<bool>(back, false),
+                        htr("Preloading {} kdata to buffer (max: {})!", back, preload_max_num));
+        }
     }
+
+    bool lazy_preload = m_hikyuuParam.tryGet<bool>("lazy_preload", false);
+    HKU_INFO_IF(lazy_preload && canLazyLoad(KQuery::MIN), htr("Use lazy preload!"));
 
     // 先加载同类K线
     auto driver = DataDriverFactory::getKDataDriverPool(m_kdataDriverParam);
     if (!driver->getPrototype()->canParallelLoad()) {
         for (size_t i = 0, len = ktypes.size(); i < len; i++) {
+            if (m_cancel_load) {
+                break;
+            }
+            if (canLazyLoad(ktypes[i])) {
+                continue;
+            }
             for (auto iter = m_stockDict.begin(); iter != m_stockDict.end(); ++iter) {
-                HKU_IF_RETURN(m_cancel_load, void());
+                if (m_cancel_load) {
+                    break;
+                }
                 const auto& low_ktype = low_ktypes[i];
                 if (m_preloadParam.tryGet<bool>(low_ktype, false)) {
                     iter->second.loadKDataToBuffer(ktypes[i]);
@@ -244,10 +262,12 @@ void StockManager::loadAllKData() {
             }
         }
 
-        if (m_hikyuuParam.tryGet<bool>("load_history_finance", true)) {
+        if (!m_cancel_load && m_hikyuuParam.tryGet<bool>("load_history_finance", true)) {
             ThreadPool tg;
             for (auto iter = m_stockDict.begin(); iter != m_stockDict.end(); ++iter) {
-                HKU_IF_RETURN(m_cancel_load, void());
+                if (m_cancel_load) {
+                    break;
+                }
                 tg.submit([stk = iter->second, this]() {
                     HKU_IF_RETURN(m_cancel_load, void());
                     stk.getHistoryFinance();
@@ -266,10 +286,17 @@ void StockManager::loadAllKData() {
             // 加载其他证券K线(可能不同不同K线驱动的证券)
             this->m_load_tg = std::make_unique<ThreadPool>();
             for (size_t i = 0, len = ktypes.size(); i < len; i++) {
-                HKU_IF_RETURN(m_cancel_load, void());
+                if (m_cancel_load) {
+                    break;
+                }
+                if (canLazyLoad(ktypes[i])) {
+                    continue;
+                }
                 std::shared_lock<std::shared_mutex> lock(*m_stockDict_mutex);
                 for (auto iter = m_stockDict.begin(); iter != m_stockDict.end(); ++iter) {
-                    HKU_IF_RETURN(m_cancel_load, void());
+                    if (m_cancel_load) {
+                        break;
+                    }
                     if (loaded_codes.find(iter->first) != loaded_codes.end()) {
                         continue;
                     }
@@ -283,10 +310,12 @@ void StockManager::loadAllKData() {
                 }
             }
 
-            if (m_hikyuuParam.tryGet<bool>("load_history_finance", true)) {
+            if (!m_cancel_load && m_hikyuuParam.tryGet<bool>("load_history_finance", true)) {
                 std::shared_lock<std::shared_mutex> lock(*m_stockDict_mutex);
                 for (auto iter = m_stockDict.begin(); iter != m_stockDict.end(); ++iter) {
-                    HKU_IF_RETURN(m_cancel_load, void());
+                    if (m_cancel_load) {
+                        break;
+                    }
                     if (loaded_codes.find(iter->first) != loaded_codes.end()) {
                         continue;
                     }
@@ -338,6 +367,10 @@ std::unordered_set<string> StockManager::tryLoadAllKDataFromColumnFirst(
             break;
         }
 
+        if (canLazyLoad(ktypes[i])) {
+            continue;
+        }
+
         if (ktypes[i] == KQuery::TIMELINE || ktypes[i] == KQuery::TRANS) {
             continue;
         }
@@ -352,9 +385,12 @@ std::unordered_set<string> StockManager::tryLoadAllKDataFromColumnFirst(
         if (k.isValid()) {
             auto datas =
               driver->getConnect()->getAllKRecordList(ktypes[i], k.datetime, m_cancel_load);
-            {
+            if (!datas.empty() && !m_cancel_load) {
                 std::shared_lock<std::shared_mutex> lock(*m_stockDict_mutex);
                 for (auto iter = m_stockDict.begin(); iter != m_stockDict.end(); ++iter) {
+                    if (m_cancel_load) {
+                        break;
+                    }
                     auto date_iter = datas.find(iter->second.market_code());
                     if (date_iter != datas.end()) {
                         iter->second.loadKDataToBufferFromKRecordList(ktypes[i],
@@ -366,11 +402,14 @@ std::unordered_set<string> StockManager::tryLoadAllKDataFromColumnFirst(
         }
     }
 
-    if (m_hikyuuParam.tryGet<bool>("load_history_finance", true)) {
+    if (!m_cancel_load && m_hikyuuParam.tryGet<bool>("load_history_finance", true)) {
         auto finances = m_baseInfoDriver->getAllHistoryFinance();
         {
             std::shared_lock<std::shared_mutex> lock(*m_stockDict_mutex);
             for (auto iter = m_stockDict.begin(); iter != m_stockDict.end(); ++iter) {
+                if (m_cancel_load) {
+                    break;
+                }
                 auto finance_iter = finances.find(iter->second.market_code());
                 if (finance_iter != finances.end()) {
                     iter->second.setHistoryFinance(std::move(finance_iter->second));

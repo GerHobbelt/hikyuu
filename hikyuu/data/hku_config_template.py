@@ -28,6 +28,7 @@ tmpdir = {dir}/tmp
 datadir = {dir}
 reload_time = {reload_time}
 quotation_server = {quotation_server}
+lazy_preload = {lazy_preload}
 
 [block]
 type = sqlite3
@@ -97,6 +98,7 @@ tmpdir = {dir}
 datadir = {dir}
 reload_time = {reload_time}
 quotation_server = {quotation_server}
+lazy_preload = {lazy_preload}
 
 [block]
 type = mysql
@@ -153,6 +155,7 @@ tmpdir = {dir}
 datadir = {dir}
 reload_time = {reload_time}
 quotation_server = {quotation_server}
+lazy_preload = {lazy_preload}
 
 [block]
 type = clickhouse
@@ -271,6 +274,9 @@ phase1_start = 00:00:00
 phase1_end = 11:35:00
 phase2_start = 12:00:00
 phase2_end = 15:05:00
+
+[lazy_preload]
+enable = False
 
 [preload]
 day = True
