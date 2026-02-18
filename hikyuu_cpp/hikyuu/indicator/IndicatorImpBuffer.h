@@ -19,7 +19,11 @@
 #include <type_traits>
 #include <utility>
 
-#include "hikyuu/config.h"
+#include "hikyuu/DataType.h"
+
+#ifndef HKU_API
+#define HKU_API
+#endif
 
 namespace hku {
 
@@ -535,7 +539,10 @@ private:
         if (current_capacity == 0) {
             return std::max(new_size, static_cast<size_type>(16));
         }
-        return std::max(new_size, current_capacity * 2);
+        // return std::max(new_size, current_capacity * 2);
+        // Indicator缓存都是预先申请空间或resize, 不按2倍增长
+        // 按实盘分钟线增量增加
+        return std::max(new_size, current_capacity) + 240;
     }
 };
 
