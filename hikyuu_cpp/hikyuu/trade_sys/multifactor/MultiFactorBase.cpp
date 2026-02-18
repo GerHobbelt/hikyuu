@@ -6,6 +6,7 @@
  */
 
 #include <cmath>
+#include <Eigen/Dense>
 #include "hikyuu/utilities/thread/algorithm.h"
 #include "hikyuu/indicator/crt/ALIGN.h"
 #include "hikyuu/indicator/crt/ROCP.h"
@@ -16,6 +17,7 @@
 #include "hikyuu/indicator/crt/SPEARMAN.h"
 #include "hikyuu/indicator/crt/CORR.h"
 #include "hikyuu/indicator/crt/ZSCORE.h"
+#include "hikyuu/StockManager.h"
 #include "MultiFactorBase.h"
 
 namespace hku {
@@ -36,6 +38,33 @@ HKU_API std::ostream& operator<<(std::ostream& out, const MultiFactorBase& mf) {
         out << "......";
     }
     out << "]";
+
+    out << "\n  normalize: " << (mf.m_norm ? mf.m_norm->name() : "NULL");
+
+    if (!mf.m_special_norms.empty()) {
+        out << "\n  special norms: " << mf.m_special_norms.size();
+        for (const auto& [name, norm] : mf.m_special_norms) {
+            out << "\n    " << name << " -> " << norm->name();
+        }
+    }
+
+    if (!mf.m_special_category.empty()) {
+        out << "\n  special catogory handle: " << mf.m_special_category.size();
+        for (const auto& [name, category] : mf.m_special_category) {
+            out << "\n    " << name << " -> " << category;
+        }
+    }
+
+    if (!mf.m_special_style_inds.empty()) {
+        out << "\n  special style inds: " << mf.m_special_style_inds.size();
+        for (const auto& [name, style_inds] : mf.m_special_style_inds) {
+            out << "\n    " << name << " -> [";
+            for (const auto& ind : style_inds) {
+                out << ind.name() << ", ";
+            }
+            out << "]";
+        }
+    }
 
     out << "\n  stocks count: " << mf.m_stks.size() << " [";
     size_t print_stk_len = std::min<size_t>(5, mf.m_stks.size());
@@ -93,11 +122,6 @@ MultiFactorBase::MultiFactorBase(const IndicatorList& inds, const StockList& stk
 void MultiFactorBase::initParam() {
     setParam<bool>("fill_null", true);
     setParam<int>("ic_n", 1);
-    setParam<bool>("enable_min_max_normalize", false);
-    setParam<bool>("enable_zscore", false);
-    setParam<bool>("zscore_out_extreme", false);
-    setParam<bool>("zscore_recursive", false);
-    setParam<double>("zscore_nsigma", 3.0);
     setParam<bool>("use_spearman", true);  // 默认使用SPEARMAN计算相关系数, 否则使用pearson相关系数
     setParam<bool>("parallel", true);
     setParam<int>("mode", 0);                   // 获取截面数据时排序模式: 0-降序, 1-升序, 2-不排序
@@ -162,6 +186,7 @@ MultiFactorPtr MultiFactorBase::clone() {
         return shared_from_this();
     }
 
+    p->m_name = m_name;
     p->m_params = m_params;
     p->m_stks = m_stks;
     p->m_ref_stk = m_ref_stk;
@@ -172,6 +197,12 @@ MultiFactorPtr MultiFactorBase::clone() {
     for (const auto& ind : m_inds) {
         p->m_inds.emplace_back(ind.clone());
     }
+
+    for (const auto& [name, norm] : m_special_norms) {
+        p->m_special_norms[name] = norm->clone();
+    }
+
+    p->m_special_category = m_special_category;
 
     p->m_calculated = false;
     // 强制重算，不克隆以下缓存，避免非线程安全
@@ -225,6 +256,50 @@ void MultiFactorBase::setRefIndicators(const IndicatorList& inds) {
     m_calculated = false;
 }
 
+void MultiFactorBase::setNormalize(NormPtr norm) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_norm = norm;
+    m_calculated = false;
+}
+
+void MultiFactorBase::addSpecialNormalize(const string& name, NormalizePtr norm,
+                                          const string& category, const IndicatorList& style_inds) {
+    // 未指定任何特殊处理
+    HKU_WARN_IF(!norm && category.empty() && style_inds.empty(),
+                "No special handling is specified!");
+
+    bool found = false;
+    for (const auto& ind : m_inds) {
+        if (ind.name() == name) {
+            found = true;
+            break;
+        }
+    }
+    HKU_CHECK(found, "Can't find factor: {}", name);
+
+    if (!category.empty()) {
+        auto blks = StockManager::instance().getBlockList(category);
+        HKU_CHECK(!blks.empty(), "Can't find category block list: {}", category);
+    }
+
+    std::lock_guard<std::mutex> lock(m_mutex);
+    _reset();
+
+    if (norm) {
+        m_special_norms[name] = norm;
+    }
+
+    if (!category.empty()) {
+        m_special_category[name] = category;
+    }
+
+    if (!style_inds.empty()) {
+        m_special_style_inds[name] = style_inds;
+    }
+
+    m_calculated = false;
+}
+
 const DatetimeList& MultiFactorBase::getDatetimeList() {
     calculate();
     return m_ref_dates;
@@ -266,6 +341,7 @@ ScoreRecordList MultiFactorBase::getScores(const Datetime& date, size_t start, s
         end = cross.size();
     }
 
+    ret.reserve(end - start);
     for (size_t i = start; i < end; i++) {
         ret.emplace_back(cross[i]);
     }
@@ -285,6 +361,7 @@ ScoreRecordList MultiFactorBase::getScores(const Datetime& date, size_t start, s
         end = cross.size();
     }
 
+    ret.reserve(end - start);
     if (filter) {
         for (size_t i = start; i < end; i++) {
             if (filter(cross[i])) {
@@ -313,6 +390,7 @@ ScoreRecordList MultiFactorBase::getScores(
         end = cross.size();
     }
 
+    ret.reserve(end - start);
     if (filter) {
         for (size_t i = start; i < end; i++) {
             if (filter(date, cross[i])) {
@@ -407,6 +485,40 @@ Indicator MultiFactorBase::getICIR(int ir_n, int ic_n) {
     return x;
 }
 
+unordered_map<string, PriceList> MultiFactorBase::_buildDummyIndex() {
+    // 如果指定了特殊的指标的行业中性化处理，则构建其行业哑变量
+    unordered_map<string, PriceList> stock_dummy_index;
+    for (const auto& [ind_name, catefory] : m_special_category) {
+        stock_dummy_index[ind_name] = PriceList(m_stks.size(), Null<price_t>());
+        auto blks = StockManager::instance().getBlockList(catefory);
+        if (blks.empty()) {
+            HKU_WARN("Block list ({}) is empty, please check your block category!", catefory);
+            continue;
+        }
+
+        auto iter = stock_dummy_index.find(ind_name);
+        auto& dummy = iter->second;
+
+        size_t blk_count = blks.size();
+        for (size_t i = 0; i < m_stks.size(); i++) {
+            bool found = false;
+            size_t j = 0;
+            for (const auto& blk : blks) {
+                if (blk.have(m_stks[i])) {
+                    dummy[i] = j;
+                    found = true;
+                    break;
+                }
+                j++;
+            }
+            if (!found) {
+                dummy[i] = blk_count;
+            }
+        }
+    }
+    return stock_dummy_index;
+}
+
 IndicatorList MultiFactorBase::_getAllReturns(int ndays) const {
     bool fill_null = getParam<bool>("fill_null");
     if (!getParam<bool>("parallel")) {
@@ -425,6 +537,134 @@ IndicatorList MultiFactorBase::_getAllReturns(int ndays) const {
     }
 }
 
+// 计算中性化后的因子，y 为因子，x 为行业哑变量（包含常数项）
+static PriceList calculate_residuals(const PriceList& y, const PriceList& x) {
+    HKU_ASSERT(y.size() == x.size());
+
+    const size_t n = x.size();
+    PriceList residuals(n, Null<price_t>());
+
+    // 计算线性回归系数（带常数项）
+    double sum_x = 0.0, sum_y = 0.0, sum_xy = 0.0, sum_x2 = 0.0;
+    size_t count = 0;
+
+    for (size_t i = 0; i < n; ++i) {
+        if (std::isnan(x[i]) || std::isinf(x[i]) || std::isnan(y[i]) || std::isinf(y[i])) {
+            continue;
+        }
+        sum_x += x[i];
+        sum_y += y[i];
+        sum_xy += x[i] * y[i];
+        sum_x2 += x[i] * x[i];
+        count++;
+    }
+
+    // 数据点不足或分母为0
+    if (count < 2 || sum_x * sum_x - count * sum_x2 == 0) {
+        return residuals;
+    }
+
+    // 计算回归系数 β₀ (截距) 和 β₁ (斜率)
+    double beta1 = (sum_x * sum_y - count * sum_xy) / (sum_x * sum_x - count * sum_x2);
+    double beta0 = (sum_y - beta1 * sum_x) / count;
+
+    if (std::isnan(beta0) || std::isinf(beta0) || std::isnan(beta1) || std::isinf(beta1)) {
+        return residuals;
+    }
+
+    // 计算拟合值和残差
+    for (size_t i = 0; i < n; ++i) {
+        if (std::isnan(x[i]) || std::isinf(x[i]) || std::isnan(y[i]) || std::isinf(y[i])) {
+            continue;
+        }
+        double y_hat = beta0 + beta1 * x[i];  // 拟合值 = β₀ + β₁x
+        residuals[i] = y[i] - y_hat;          // 残差 = 观测值 - 拟合值
+    }
+
+    return residuals;
+}
+
+// 计算多元回归中性化后的因子，y为因子，x为多个解释变量（包含常数项）- Eigen版本
+static PriceList calculate_residuals(const PriceList& y, const std::vector<PriceList>& x) {
+    HKU_ASSERT(!x.empty());
+    size_t n = y.size();
+    for (const auto& xi : x) {
+        HKU_ASSERT(xi.size() == n);
+    }
+
+    PriceList residuals(n, Null<price_t>());
+    size_t k = x.size();  // 解释变量个数
+
+    // 构建设计矩阵和因变量向量
+    Eigen::MatrixXd Xmat(n, k + 1);
+    Eigen::VectorXd Yvec(n);
+
+    // 填充数据 - 第一列为常数项（全1）
+    Xmat.col(0).setConstant(1.0);
+
+    // 标记有效数据点
+    std::vector<bool> valid(n, true);
+
+    for (size_t i = 0; i < n; ++i) {
+        Yvec(i) = y[i];
+
+        // 检查因变量是否有效
+        if (std::isnan(y[i]) || std::isinf(y[i])) {
+            valid[i] = false;
+            continue;
+        }
+
+        // 填充自变量并检查有效性
+        for (size_t j = 0; j < k; ++j) {
+            Xmat(i, j + 1) = x[j][i];
+            if (std::isnan(x[j][i]) || std::isinf(x[j][i])) {
+                valid[i] = false;
+                break;
+            }
+        }
+    }
+
+    // 计算有效数据点数量
+    size_t valid_count = std::count(valid.begin(), valid.end(), true);
+
+    // 数据点不足
+    if (valid_count <= k + 1) {
+        return residuals;
+    }
+
+    // 创建有效数据的子矩阵
+    Eigen::MatrixXd X_valid(valid_count, k + 1);
+    Eigen::VectorXd Y_valid(valid_count);
+
+    size_t valid_idx = 0;
+    for (size_t i = 0; i < n; ++i) {
+        if (valid[i]) {
+            X_valid.row(valid_idx) = Xmat.row(i);
+            Y_valid(valid_idx) = Yvec(i);
+            valid_idx++;
+        }
+    }
+
+    // 使用QR分解求解线性回归 β = (X'X)^(-1)X'Y
+    Eigen::VectorXd beta = X_valid.colPivHouseholderQr().solve(Y_valid);
+
+    // 检查解是否有效
+    if (beta.hasNaN()) {
+        return residuals;
+    }
+
+    // 计算拟合值和残差
+    Eigen::VectorXd fitted = Xmat * beta;
+
+    for (size_t i = 0; i < n; ++i) {
+        if (valid[i]) {
+            residuals[i] = y[i] - fitted(i);
+        }
+    }
+
+    return residuals;
+}
+
 vector<IndicatorList> MultiFactorBase::getAllSrcFactors() {
     vector<IndicatorList> all_stk_inds;
     size_t stk_count = m_stks.size();
@@ -437,10 +677,16 @@ vector<IndicatorList> MultiFactorBase::getAllSrcFactors() {
     bool fill_null = getParam<bool>("fill_null");
     size_t ind_count = m_inds.size();
 
+    unordered_map<string, IndicatorList> use_style_inds;
+    for (const auto& [name, style_inds] : m_special_style_inds) {
+        use_style_inds[name] = IndicatorList(style_inds.size());
+    }
+
     bool parallel = getParam<bool>("parallel");
     if (parallel) {
         parallel_for_index_void(
-          0, stk_count, [this, &all_stk_inds, &null_ind, &ind_count, &fill_null](size_t i) {
+          0, stk_count,
+          [this, &all_stk_inds, &null_ind, &use_style_inds, ind_count, fill_null](size_t i) {
               const auto& stk = m_stks[i];
               auto kdata = stk.getKData(m_query);
               auto& cur_stk_inds = all_stk_inds[i];
@@ -452,6 +698,16 @@ vector<IndicatorList> MultiFactorBase::getAllSrcFactors() {
                       cur_stk_inds[j] = ALIGN(m_inds[j](kdata), m_ref_dates, fill_null);
                   }
                   cur_stk_inds[j].name(m_inds[j].name());
+              }
+              for (auto& [name, styles] : m_special_style_inds) {
+                  auto& cur_style_inds = use_style_inds[name];
+                  for (size_t j = 0; j < styles.size(); j++) {
+                      if (kdata.size() == 0) {
+                          cur_style_inds[j] = null_ind;
+                      } else {
+                          cur_style_inds[j] = ALIGN(styles[j](kdata), m_ref_dates, fill_null);
+                      }
+                  }
               }
           });
 
@@ -469,60 +725,123 @@ vector<IndicatorList> MultiFactorBase::getAllSrcFactors() {
                 }
                 cur_stk_inds[j].name(m_inds[j].name());
             }
-        }
-    }
-
-    // 每日截面归一化
-    if (getParam<bool>("enable_min_max_normalize")) {
-        for (size_t di = 0; di < days_total; di++) {
-            for (size_t ii = 0; ii < ind_count; ii++) {
-                Indicator::value_t min_value = std::numeric_limits<Indicator::value_t>::max();
-                Indicator::value_t max_value = std::numeric_limits<Indicator::value_t>::min();
-                for (size_t si = 0; si < stk_count; si++) {
-                    auto value = all_stk_inds[si][ii][di];
-                    if (!std::isnan(value)) {
-                        if (value > max_value) {
-                            max_value = value;
-                        } else if (value < min_value) {
-                            min_value = value;
-                        }
-                    }
-                }
-
-                if (max_value == min_value ||
-                    max_value == std::numeric_limits<Indicator::value_t>::max()) {
-                    for (size_t si = 0; si < stk_count; si++) {
-                        auto* dst = all_stk_inds[si][ii].data();
-                        dst[di] = Null<Indicator::value_t>();
-                    }
-                } else {
-                    Indicator::value_t diff = max_value - min_value;
-                    for (size_t si = 0; si < stk_count; si++) {
-                        auto* dst = all_stk_inds[si][ii].data();
-                        dst[di] = (dst[di] - min_value) / diff;
+            for (auto& [name, styles] : m_special_style_inds) {
+                auto& cur_style_inds = use_style_inds[name];
+                for (size_t j = 0; j < styles.size(); j++) {
+                    if (kdata.size() == 0) {
+                        cur_style_inds[j] = null_ind;
+                    } else {
+                        cur_style_inds[j] = ALIGN(styles[j](kdata), m_ref_dates, fill_null);
                     }
                 }
             }
         }
     }
 
-    // 每日截面标准化
-    if (getParam<bool>("enable_zscore")) {
-        Indicator one_day = PRICELIST(PriceList(stk_count, Null<price_t>()));
-        for (size_t di = 0; di < days_total; di++) {
-            for (size_t ii = 0; ii < ind_count; ii++) {
-                auto* one_day_data = one_day.data();
-                for (size_t si = 0; si < stk_count; si++) {
-                    one_day_data[si] = all_stk_inds[si][ii][di];
-                }
+    // 时间截面标准化/归一化
+    if (m_norm || !m_special_category.empty() || !m_special_style_inds.empty()) {
+        unordered_map<string, PriceList> ind_dummy_dict = _buildDummyIndex();
+        if (parallel) {
+            parallel_for_index_void(
+              0, days_total,
+              [this, stk_count, ind_count, sub_norm = m_norm ? m_norm->clone() : m_norm,
+               &all_stk_inds, &ind_dummy_dict, &use_style_inds](size_t di) {
+                  NormPtr special_norm;
+                  PriceList one_day(stk_count, Null<price_t>());
+                  PriceList new_value;
+                  for (size_t ii = 0; ii < ind_count; ii++) {
+                      auto* one_day_data = one_day.data();
+                      for (size_t si = 0; si < stk_count; si++) {
+                          one_day_data[si] = all_stk_inds[si][ii][di];
+                      }
 
-                auto new_value =
-                  ZSCORE(one_day, getParam<bool>("zscore_out_extreme"),
-                         getParam<double>("zscore_nsigma"), getParam<bool>("zscore_recursive"));
+                      auto ind_name = all_stk_inds[0][ii].name();
+                      auto special_norm_iter = m_special_norms.find(ind_name);
+                      if (special_norm_iter != m_special_norms.end()) {
+                          special_norm = special_norm_iter->second->clone();
+                      } else {
+                          special_norm.reset();
+                      }
 
-                for (size_t si = 0; si < stk_count; si++) {
-                    auto* dst = all_stk_inds[si][ii].data();
-                    dst[di] = new_value[si];
+                      if (special_norm) {
+                          new_value = special_norm->normalize(one_day);
+                      } else if (sub_norm) {
+                          new_value = sub_norm->normalize(one_day);
+                      } else {
+                          new_value = one_day;
+                      }
+
+                      auto category_iter = ind_dummy_dict.find(ind_name);
+                      if (category_iter != ind_dummy_dict.end()) {
+                          new_value = calculate_residuals(new_value, category_iter->second);
+                      }
+                      auto style_iter = use_style_inds.find(ind_name);
+                      if (style_iter != use_style_inds.end()) {
+                          vector<PriceList> style_value_day(style_iter->second.size());
+                          for (size_t j = 0; j < style_iter->second.size(); j++) {
+                              auto& style_value = style_value_day[j];
+                              style_value.resize(stk_count);
+                              for (size_t si = 0; si < stk_count; si++) {
+                                  style_value[si] = style_iter->second[j][di];
+                              }
+                          }
+                          new_value = calculate_residuals(new_value, style_value_day);
+                      }
+
+                      for (size_t si = 0; si < stk_count; si++) {
+                          auto* dst = all_stk_inds[si][ii].data();
+                          dst[di] = new_value[si];
+                      }
+                  }
+              });
+        } else {
+            NormPtr special_norm;
+            PriceList new_value;
+            PriceList one_day(stk_count, Null<price_t>());
+            for (size_t di = 0; di < days_total; di++) {
+                for (size_t ii = 0; ii < ind_count; ii++) {
+                    auto* one_day_data = one_day.data();
+                    for (size_t si = 0; si < stk_count; si++) {
+                        one_day_data[si] = all_stk_inds[si][ii][di];
+                    }
+
+                    auto ind_name = all_stk_inds[0][ii].name();
+                    auto special_norm_iter = m_special_norms.find(ind_name);
+                    if (special_norm_iter != m_special_norms.end()) {
+                        special_norm = special_norm_iter->second;
+                    } else {
+                        special_norm.reset();
+                    }
+
+                    if (special_norm) {
+                        new_value = special_norm->normalize(one_day);
+                    } else if (m_norm) {
+                        new_value = m_norm->normalize(one_day);
+                    } else {
+                        new_value = one_day;
+                    }
+
+                    auto category_iter = ind_dummy_dict.find(ind_name);
+                    if (category_iter != ind_dummy_dict.end()) {
+                        new_value = calculate_residuals(new_value, category_iter->second);
+                    }
+                    auto style_iter = use_style_inds.find(ind_name);
+                    if (style_iter != use_style_inds.end()) {
+                        vector<PriceList> style_value_day(style_iter->second.size());
+                        for (size_t j = 0; j < style_iter->second.size(); j++) {
+                            auto& style_value = style_value_day[j];
+                            style_value.resize(stk_count);
+                            for (size_t si = 0; si < stk_count; si++) {
+                                style_value[si] = style_iter->second[j][di];
+                            }
+                        }
+                        new_value = calculate_residuals(new_value, style_value_day);
+                    }
+
+                    for (size_t si = 0; si < stk_count; si++) {
+                        auto* dst = all_stk_inds[si][ii].data();
+                        dst[di] = new_value[si];
+                    }
                 }
             }
         }
