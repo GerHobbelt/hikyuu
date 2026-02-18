@@ -25,7 +25,7 @@ TaStoch::TaStoch() : IndicatorImp("TA_STOCH", 2) {
 TaStoch::TaStoch(const KData& k, int fastk_n, int slowk_n, int slowk_matype, int slowd_n,
                  int slowd_matype)
 : IndicatorImp("TA_STOCH", 2) {
-    setParam<KData>("kdata", k);
+    onlySetContext(k);
     setParam<int>("fastk_n", fastk_n);
     setParam<int>("slowk_n", slowk_n);
     setParam<int>("slowk_matype", slowk_matype);
@@ -48,7 +48,7 @@ void TaStoch::_calculate(const Indicator& data) {
     HKU_WARN_IF(!isLeaf() && !data.empty(),
                 "The input is ignored because {} depends on the context!", m_name);
 
-    KData k = getContext();
+    const KData& k = getContext();
     size_t total = k.size();
     HKU_IF_RETURN(total == 0, void());
 

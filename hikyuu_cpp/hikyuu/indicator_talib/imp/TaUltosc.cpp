@@ -21,7 +21,7 @@ TaUltosc::TaUltosc() : IndicatorImp("TA_ULTOSC", 1) {
 }
 
 TaUltosc::TaUltosc(const KData& k, int n1, int n2, int n3) : IndicatorImp("TA_ULTOSC", 1) {
-    setParam<KData>("kdata", k);
+    onlySetContext(k);
     setParam<int>("n1", n1);
     setParam<int>("n2", n2);
     setParam<int>("n3", n3);
@@ -39,7 +39,7 @@ void TaUltosc::_calculate(const Indicator& data) {
     HKU_WARN_IF(!isLeaf() && !data.empty(),
                 "The input is ignored because {} depends on the context!", m_name);
 
-    KData k = getContext();
+    const KData& k = getContext();
     size_t total = k.size();
     HKU_IF_RETURN(total == 0, void());
 

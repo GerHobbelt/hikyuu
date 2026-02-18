@@ -20,7 +20,7 @@ TaSar::TaSar() : IndicatorImp("TA_SAR", 1) {
 }
 
 TaSar::TaSar(const KData& k, double acceleration, double maximum) : IndicatorImp("TA_SAR", 1) {
-    setParam<KData>("kdata", k);
+    onlySetContext(k);
     setParam<double>("acceleration", acceleration);
     setParam<double>("maximum", maximum);
     TaSar::_calculate(Indicator());
@@ -37,7 +37,7 @@ void TaSar::_calculate(const Indicator& data) {
     HKU_WARN_IF(!isLeaf() && !data.empty(),
                 "The input is ignored because {} depends on the context!", m_name);
 
-    KData k = getContext();
+    const KData& k = getContext();
     size_t total = k.size();
     HKU_IF_RETURN(total == 0, void());
 

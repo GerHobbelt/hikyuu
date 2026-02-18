@@ -28,7 +28,7 @@ IFinance::IFinance() : IndicatorImp("FINANCE", 1) {
 IFinance::IFinance(const KData& k) : IndicatorImp("FINANCE", 1) {
     setParam<int>("field_ix", 0);
     setParam<string>("field_name", "");
-    setParam<KData>("kdata", k);
+    onlySetContext(k);
     setParam<bool>("only_year_report", false);
     setParam<bool>("dynamic", false);
     IFinance::_calculate(Indicator());
@@ -38,7 +38,7 @@ void IFinance::_calculate(const Indicator& data) {
     HKU_WARN_IF(!isLeaf() && !data.empty(),
                 "The input is ignored because {} depends on the context!", m_name);
 
-    KData kdata = getContext();
+    const KData& kdata = getContext();
     size_t total = kdata.size();
     if (total == 0) {
         return;

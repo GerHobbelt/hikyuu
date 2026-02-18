@@ -20,7 +20,7 @@ TaAdosc::TaAdosc() : IndicatorImp("TA_ADOSC", 1) {
 }
 
 TaAdosc::TaAdosc(const KData& k, int fast_n, int slow_n) : IndicatorImp("TA_ADOSC", 1) {
-    setParam<KData>("kdata", k);
+    onlySetContext(k);
     setParam<int>("fast_n", fast_n);
     setParam<int>("slow_n", slow_n);
     TaAdosc::_calculate(Indicator());
@@ -40,7 +40,7 @@ void TaAdosc::_calculate(const Indicator& data) {
     HKU_WARN_IF(!isLeaf() && !data.empty(),
                 "The input is ignored because {} depends on the context!", m_name);
 
-    KData k = getContext();
+    const KData& k = getContext();
     size_t total = k.size();
     if (total == 0) {
         return;

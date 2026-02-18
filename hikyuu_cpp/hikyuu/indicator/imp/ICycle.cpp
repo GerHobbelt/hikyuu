@@ -21,7 +21,7 @@ ICycle::ICycle() : IndicatorImp("CYCLE", 1) {
 
 ICycle::ICycle(const KData& k) : IndicatorImp("CYCLE", 1) {
     _initParams();
-    setParam<KData>("kdata", k);
+    onlySetContext(k);
     ICycle::_calculate(Indicator());
 }
 
@@ -226,7 +226,7 @@ void ICycle::_calculate(const Indicator& data) {
     HKU_WARN_IF(!isLeaf() && !data.empty(),
                 "The input is ignored because {} depends on the context!", m_name);
 
-    KData k = getContext();
+    const KData& k = getContext();
     size_t total = k.size();
     HKU_IF_RETURN(total == 0, void());
 

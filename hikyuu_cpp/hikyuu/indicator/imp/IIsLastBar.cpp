@@ -16,7 +16,7 @@ namespace hku {
 IIsLastBar::IIsLastBar() : IndicatorImp("ISLASTBAR", 1) {}
 
 IIsLastBar::IIsLastBar(const KData &k) : IndicatorImp("ISLASTBAR", 1) {
-    setParam<KData>("kdata", k);
+    onlySetContext(k);
     IIsLastBar::_calculate(Indicator());
 }
 
@@ -25,7 +25,7 @@ IIsLastBar::~IIsLastBar() {}
 void IIsLastBar::_calculate(const Indicator &data) {
     size_t total = data.size();
     if (isLeaf()) {
-        KData k = getContext();
+        const KData &k = getContext();
         total = k.size();
         _readyBuffer(total, 1);
         if (total >= 1) {

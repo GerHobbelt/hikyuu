@@ -22,18 +22,9 @@ class HIDDEN PyMultiFactor : public MultiFactorBase {
 
 public:
     using MultiFactorBase::MultiFactorBase;
-    PyMultiFactor(const MultiFactorBase& base) : MultiFactorBase(base) {
-        py::gil_scoped_acquire gil;
-        m_py_norm.release();
-    }
+    PyMultiFactor(const MultiFactorBase& base) : MultiFactorBase(base) {}
 
-    virtual ~PyMultiFactor() override {
-        py::gil_scoped_acquire gil;
-        m_py_norm.release();
-        for (auto& item : m_py_special_norms) {
-            item.second.release();
-        }
-    }
+    virtual ~PyMultiFactor() override {}
 
     IndicatorList _calculate(const vector<IndicatorList>& all_stk_inds) override {
         // PYBIND11_OVERLOAD_PURE_NAME(IndicatorList, MultiFactorBase, "_calculate", _calculate,
@@ -48,28 +39,19 @@ public:
 public:
     void set_norm(py::object norm) {
         py::gil_scoped_acquire gil;
-        HKU_IF_RETURN(!norm || norm.is_none(), void());
+        auto tmp = norm;
         setNormalize(norm.cast<NormPtr>());
-        if (m_norm && m_norm->isPythonObject()) {
-            m_py_norm.release();
-            m_py_norm = norm;
-        }
+        tmp.release();
     }
 
     void add_special_norm(const string& name, py::object norm, const string& category,
                           const IndicatorList& style_inds) {
         py::gil_scoped_acquire gil;
         HKU_INFO_IF_RETURN(!norm || norm.is_none(), void(), "norm is None");
+        auto tmp = norm;
         addSpecialNormalize(name, norm.cast<NormPtr>(), category, style_inds);
-        if (m_special_norms[name] && m_special_norms[name]->isPythonObject()) {
-            m_py_special_norms[name].release();
-            m_py_special_norms[name] = norm;
-        }
+        tmp.release();
     }
-
-private:
-    py::object m_py_norm;
-    unordered_map<string, py::object> m_py_special_norms;
 };
 
 void export_MultiFactor(py::module& m) {
@@ -241,10 +223,15 @@ void export_MultiFactor(py::module& m) {
     
     :param NormalizeBase norm: 标准化或归一化方法实例)")
 
-      .def("add_special_normalize", &MultiFactorBase::addSpecialNormalize, py::arg("name"),
-           py::arg("norm") = NormPtr(), py::arg("category") = "",
-           py::arg("style_inds") = IndicatorList(),
-           R"(add_special_normalize(self, name[, norm=None, category="", style_inds=[]])
+      .def(
+        "add_special_normalize",
+        [](PyMultiFactor& self, const string& name, py::object norm, const string& category,
+           const IndicatorList& style_inds) {
+            self.add_special_norm(name, norm, category, style_inds);
+        },
+        py::arg("name"), py::arg("norm") = NormPtr(), py::arg("category") = "",
+        py::arg("style_inds") = IndicatorList(),
+        R"(add_special_normalize(self, name[, norm=None, category="", style_inds=[]])
         
     对指定名称的指标应用特定的标准化/归一化、行业中性化、风格因子中性化操作。标准化操作、行业中性化、风格因子中性化彼此无关，可同时指定也可分开指定。
 

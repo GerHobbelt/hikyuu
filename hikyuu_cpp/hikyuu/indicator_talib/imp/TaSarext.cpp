@@ -44,7 +44,7 @@ TaSarext::TaSarext(const KData& k, double startvalue, double offsetonreverse,
                    double accelerationinitshort, double accelerationshort,
                    double accelerationmaxshort)
 : IndicatorImp("TA_SAREXT", 1) {
-    setParam<KData>("kdata", k);
+    onlySetContext(k);
     setParam<double>("startvalue", startvalue);
     setParam<double>("offsetonreverse", offsetonreverse);
     setParam<double>("accelerationinitlong", accelerationinitlong);
@@ -72,7 +72,7 @@ void TaSarext::_calculate(const Indicator& data) {
     HKU_WARN_IF(!isLeaf() && !data.empty(),
                 "The input is ignored because {} depends on the context!", m_name);
 
-    KData k = getContext();
+    const KData& k = getContext();
     size_t total = k.size();
     HKU_IF_RETURN(total == 0, void());
 

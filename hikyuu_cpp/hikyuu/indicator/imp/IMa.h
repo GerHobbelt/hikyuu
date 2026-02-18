@@ -14,13 +14,18 @@
 namespace hku {
 
 class IMa : public IndicatorImp {
-    INDICATOR_IMP_SUPPORT_DYNAMIC_STEP(IMa)
+    INDICATOR_IMP(IMa)
+    INDICATOR_IMP_SUPPORT_INCREMENT
+    INDICATOR_IMP_SUPPORT_DYNAMIC_CYCLE
     INDICATOR_IMP_NO_PRIVATE_MEMBER_SERIALIZATION
 
 public:
     IMa();
     virtual ~IMa();
     virtual void _checkParam(const string& name) const override;
+
+    virtual bool use_increment_calulate(const Indicator& ind, size_t total,
+                                        size_t overlap_len) const override;
 };
 
 } /* namespace hku */
