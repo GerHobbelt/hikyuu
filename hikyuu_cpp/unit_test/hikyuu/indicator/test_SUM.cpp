@@ -12,6 +12,7 @@
 #include <hikyuu/indicator/crt/CVAL.h>
 #include <hikyuu/indicator/crt/KDATA.h>
 #include <hikyuu/indicator/crt/PRICELIST.h>
+#include <hikyuu/indicator/crt/DISCARD.h>
 
 using namespace hku;
 
@@ -54,15 +55,73 @@ TEST_CASE("test_SUM") {
     /** @arg n = 9 */
     result = SUM(data, 9);
     CHECK_EQ(result.size(), 10);
-    // CHECK_EQ(result.discard(), 8);
+    CHECK_EQ(result.discard(), 8);
     CHECK_EQ(result[8], 36);
     CHECK_EQ(result[9], 45);
 
     /** @arg n = 10 */
     result = SUM(data, 10);
+    result = SUM(result, 1);
     CHECK_EQ(result.size(), 10);
-    // CHECK_EQ(result.discard(), 9);
+    CHECK_EQ(result.discard(), 9);
     CHECK_EQ(result[9], 45);
+
+    /** @arg 增量计算 n=0 */
+    auto stk = getStock("sz000001");
+    auto k1 = stk.getKData(KQuery(-10, -8));
+    auto k2 = stk.getKData(KQuery(-9, -6));
+    auto k3 = stk.getKData(KQuery(-5));
+    result = SUM(CLOSE(), 0)(k1)(k2);
+    check_indicator(result, SUM(CLOSE(), 0)(k2));
+
+    /** @arg 增量计算 n=1 */
+    result = SUM(CLOSE(), 1)(k1)(k2);
+    check_indicator(result, SUM(CLOSE(), 1)(k2));
+    result = SUM(CLOSE(), 1)(k1)(k3);
+    check_indicator(result, SUM(CLOSE(), 1)(k3));
+
+    /** @arg 增量计算 n=3 */
+    result = SUM(CLOSE(), 3)(k1)(k2);
+    check_indicator(result, SUM(CLOSE(), 3)(k2));
+
+    // 重叠长度小于 discard
+    k1 = stk.getKData(KQuery(-10, -4));
+    k3 = stk.getKData(KQuery(-5));
+    result = SUM(CLOSE(), 3)(k1)(k3);
+    check_indicator(result, SUM(CLOSE(), 3)(k3));
+
+    k3 = stk.getKData(KQuery(-6));
+    result = SUM(CLOSE(), 3)(k1)(k3);
+    check_indicator(result, SUM(CLOSE(), 3)(k3));
+
+    // 重叠长度等于 discard
+    k1 = stk.getKData(KQuery(-10, -4));
+    k3 = stk.getKData(KQuery(-7));
+    result = SUM(CLOSE(), 3)(k1);
+    result.setContext(k3);
+    auto expect = SUM(CLOSE(), 3)(k3);
+    CHECK_EQ(result.size(), expect.size());
+    CHECK_EQ(result.discard(), 0);
+    CHECK_EQ(result[0], doctest::Approx(47.39).epsilon(0.0001));
+    CHECK_EQ(result[1], doctest::Approx(47.41).epsilon(0.0001));
+    for (size_t i = expect.discard(); i < result.size(); i++) {
+        CHECK_EQ(result[i], doctest::Approx(expect[i]).epsilon(0.0001));
+    }
+
+    // 重叠长度大于 discard
+    k1 = stk.getKData(KQuery(-10, -4));
+    k3 = stk.getKData(KQuery(-8));
+    result = SUM(CLOSE(), 3)(k1);
+    result.setContext(k3);
+    expect = SUM(CLOSE(), 3)(k3);
+    CHECK_EQ(result.size(), expect.size());
+    CHECK_EQ(result.discard(), 0);
+    CHECK_EQ(result[0], doctest::Approx(47.65).epsilon(0.0001));
+    CHECK_EQ(result[1], doctest::Approx(47.39).epsilon(0.0001));
+    CHECK_EQ(result[2], doctest::Approx(47.41).epsilon(0.0001));
+    for (size_t i = expect.discard(); i < result.size(); i++) {
+        CHECK_EQ(result[i], doctest::Approx(expect[i]).epsilon(0.0001));
+    }
 }
 
 /** @par 检测点 */

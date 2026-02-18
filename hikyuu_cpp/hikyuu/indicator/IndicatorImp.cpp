@@ -140,18 +140,15 @@ HKU_API std::ostream &operator<<(std::ostream &os, const IndicatorImpPtr &imp) {
     return os;
 }
 
-IndicatorImp::IndicatorImp()
-: m_name("IndicatorImp"), m_discard(0), m_result_num(0), m_need_calculate(true), m_optype(LEAF) {
+IndicatorImp::IndicatorImp() : m_name("IndicatorImp") {
     memset(m_pBuffer, 0, sizeof(vector<value_t> *) * MAX_RESULT_NUM);
 }
 
-IndicatorImp::IndicatorImp(const string &name)
-: m_name(name), m_discard(0), m_result_num(0), m_need_calculate(true), m_optype(LEAF) {
+IndicatorImp::IndicatorImp(const string &name) : m_name(name) {
     memset(m_pBuffer, 0, sizeof(vector<value_t> *) * MAX_RESULT_NUM);
 }
 
-IndicatorImp::IndicatorImp(const string &name, size_t result_num)
-: m_name(name), m_discard(0), m_need_calculate(true), m_optype(LEAF) {
+IndicatorImp::IndicatorImp(const string &name, size_t result_num) : m_name(name) {
     memset(m_pBuffer, 0, sizeof(vector<value_t> *) * MAX_RESULT_NUM);
     m_result_num = result_num < MAX_RESULT_NUM ? result_num : MAX_RESULT_NUM;
     _readyBuffer(0, m_result_num);
@@ -161,6 +158,7 @@ void IndicatorImp::baseCheckParam(const string &name) const {}
 
 void IndicatorImp::paramChanged() {
     m_need_calculate = true;
+    m_param_changed = true;
 }
 
 void IndicatorImp::setIndParam(const string &name, const Indicator &ind) {
@@ -183,9 +181,14 @@ const IndicatorImpPtr &IndicatorImp::getIndParamImp(const string &name) const {
     return m_ind_params.at(name);
 }
 
+bool IndicatorImp::supportIncrementCalculate() const {
+    return false;
+}
+
 bool IndicatorImp::can_inner_calculate() {
-    if (!ms_enable_increment_calculate || m_need_calculate || m_result_num == 0 ||
-        m_context.empty() || size() < m_context.size() || m_old_context.size() < m_context.size()) {
+    if (m_need_calculate || !ms_enable_increment_calculate || m_result_num == 0 ||
+        m_context.empty() || size() < m_context.size() || m_old_context.size() < m_context.size() ||
+        !supportIncrementCalculate()) {
         return false;
     }
 
@@ -204,6 +207,7 @@ bool IndicatorImp::can_inner_calculate() {
     if (start_pos == Null<size_t>()) {
         return false;
     }
+
     size_t last_pos = m_old_context.getPos(m_context.back().datetime);
     if (last_pos == Null<size_t>()) {
         return false;
@@ -227,7 +231,7 @@ bool IndicatorImp::can_inner_calculate() {
         m_pBuffer[r]->resize(total);
     }
 
-    _update_discard();
+    m_discard = start_pos >= m_discard ? 0 : m_discard - start_pos;
     m_need_calculate = false;
 
     return true;
@@ -338,10 +342,10 @@ string IndicatorImp::str() const {
     os << "Indicator{\n"
        << "  name: " << name() << "\n  size: " << size() << "\n  discard: " << discard()
        << "\n  result sets: " << getResultNumber() << "\n  params: " << getParameter()
-       << "\n  support indicator param: " << (supportIndParam() ? "True" : "False");
-    if (supportIndParam()) {
+       << "\n  is python object: " << (isPythonObject() ? "True" : "False");
+    const auto &ind_params = getIndParams();
+    if (!ind_params.empty()) {
         os << "\n  ind params: {";
-        const auto &ind_params = getIndParams();
         for (auto iter = ind_params.begin(); iter != ind_params.end(); ++iter) {
             os << iter->first << ": " << iter->second->formula() << ", ";
         }
@@ -362,14 +366,40 @@ string IndicatorImp::str() const {
     return os.str();
 }
 
+void IndicatorImp::swap(IndicatorImp *other) {
+    HKU_ASSERT(other != nullptr);
+    HKU_IF_RETURN(this == other, void());
+    HKU_ASSERT(other->m_result_num == m_result_num);
+    HKU_ASSERT(other->size() == size());
+    for (size_t r = 0; r < m_result_num; ++r) {
+        vector<value_t> *tmp = m_pBuffer[r];
+        m_pBuffer[r] = other->m_pBuffer[r];
+        other->m_pBuffer[r] = tmp;
+    }
+}
+
+void IndicatorImp::swap(IndicatorImp *other, size_t other_result_idx, size_t self_result_idx) {
+    HKU_ASSERT(other != nullptr);
+    HKU_ASSERT(other->size() == size());
+    HKU_ASSERT(other_result_idx < other->m_result_num);
+    HKU_ASSERT(self_result_idx < m_result_num);
+    vector<value_t> *tmp = m_pBuffer[self_result_idx];
+    m_pBuffer[self_result_idx] = other->m_pBuffer[other_result_idx];
+    other->m_pBuffer[other_result_idx] = tmp;
+}
+
 IndicatorImpPtr IndicatorImp::clone() {
     IndicatorImpPtr p = _clone();
     p->m_params = m_params;
     p->m_name = m_name;
+    p->m_is_python_object = m_is_python_object;
+    p->m_need_self_alike_compare = m_need_self_alike_compare;
+    p->m_is_serial = m_is_serial;
     p->m_discard = m_discard;
     p->m_result_num = m_result_num;
     p->m_context = m_context;
     p->m_need_calculate = m_need_calculate;
+    p->m_param_changed = m_param_changed;
     p->m_optype = m_optype;
     p->m_parent = m_parent;
 
@@ -799,11 +829,6 @@ void IndicatorImp::_calculate(const Indicator &ind) {
     }
 }
 
-bool IndicatorImp::use_increment_calulate(const Indicator &ind, size_t total,
-                                          size_t overlap_len) const {
-    return overlap_len > 0;
-}
-
 bool IndicatorImp::can_increment_calculate() {
     if (m_result_num == 0 || m_context.empty() || m_old_context.empty()) {
         return false;
@@ -826,21 +851,29 @@ bool IndicatorImp::can_increment_calculate() {
     return true;
 }
 
-bool IndicatorImp::increment_execute_leaf() {
-    if (!ms_enable_increment_calculate || !supportIncrementCalculate() ||
+bool IndicatorImp::increment_execute_leaf_or_op(const Indicator &ind) {
+    if (m_param_changed || !ms_enable_increment_calculate || !supportIncrementCalculate() ||
         !can_increment_calculate()) {
         return false;
     }
 
-    size_t start_pos = m_old_context.getPos(m_context.front().datetime);
-    if (start_pos == Null<size_t>()) {
+    size_t copy_start_pos = m_old_context.getPos(m_context.front().datetime);
+    if (copy_start_pos == Null<size_t>()) {
         return false;
     }
 
     size_t total = m_context.size();
-    size_t copy_len = m_old_context.size() - start_pos;
-    HKU_ASSERT(copy_len <= total);
-    if (!use_increment_calulate(Indicator(), total, copy_len)) {
+    size_t copy_len = m_old_context.size() - copy_start_pos;
+    if (copy_len < m_discard) {
+        return false;
+    }
+
+    size_t start_pos = m_context.getPos(m_old_context.back().datetime);
+    if (start_pos == Null<size_t>()) {
+        return false;
+    }
+
+    if (start_pos < min_increment_start()) {
         return false;
     }
 
@@ -848,57 +881,22 @@ bool IndicatorImp::increment_execute_leaf() {
         if (m_pBuffer[r] == nullptr) {
             return false;
         }
-        m_pBuffer[r]->resize(total);
-        auto *dst = m_pBuffer[r]->data();
-        memmove(dst, dst + start_pos, sizeof(value_t) * (copy_len));
-    }
-
-    start_pos = m_context.getPos(m_old_context.back().datetime);
-    if (start_pos == Null<size_t>()) {
-        return false;
-    }
-
-    _increment_calculate(Indicator(), start_pos);
-    return true;
-}
-
-bool IndicatorImp::increment_execute_op(const Indicator &ind) {
-    if (!ms_enable_increment_calculate || !supportIncrementCalculate() ||
-        ind.size() != m_context.size() || !can_increment_calculate()) {
-        return false;
-    }
-
-    size_t start_pos = m_old_context.getPos(m_context.front().datetime);
-    if (start_pos == Null<size_t>()) {
-        return false;
-    }
-
-    size_t total = m_context.size();
-    size_t copy_len = m_old_context.size() - start_pos;
-    HKU_ASSERT(copy_len <= total);
-    if (!use_increment_calulate(ind, total, copy_len)) {
-        return false;
-    }
-
-    for (size_t r = 0; r < m_result_num; ++r) {
-        if (m_pBuffer[r] == nullptr) {
-            return false;
-        }
-        m_pBuffer[r]->resize(total);
+        m_pBuffer[r]->resize(total, Null<value_t>());
         auto *dst = this->data(r);
-        memmove(dst, dst + start_pos, sizeof(value_t) * (copy_len));
+        memmove(dst, dst + copy_start_pos, sizeof(value_t) * (copy_len));
     }
 
-    start_pos = m_context.getPos(m_old_context.back().datetime);
-    if (start_pos == Null<size_t>()) {
-        return false;
+    if (start_pos < m_discard) {
+        start_pos = m_discard;
     }
 
-    if (start_pos < ind.discard()) {
-        start_pos = ind.discard();
+    m_discard = 0;
+
+    if (start_pos < total) {
+        _increment_calculate(ind, start_pos);
     }
 
-    _increment_calculate(ind, start_pos);
+    _update_discard();
     return true;
 }
 
@@ -916,7 +914,7 @@ Indicator IndicatorImp::calculate() {
     switch (m_optype) {
         case LEAF:
             if (m_ind_params.empty()) {
-                if (!increment_execute_leaf()) {
+                if (!increment_execute_leaf_or_op(Indicator())) {
                     _calculate(Indicator());
                 }
             } else {
@@ -926,7 +924,7 @@ Indicator IndicatorImp::calculate() {
 
         case OP: {
             if (m_ind_params.empty()) {
-                if (!increment_execute_op(Indicator(m_right))) {
+                if (!increment_execute_leaf_or_op(Indicator(m_right))) {
                     m_right->calculate();
                     _readyBuffer(m_right->size(), m_result_num);
                     _calculate(Indicator(m_right));
@@ -1010,6 +1008,9 @@ Indicator IndicatorImp::calculate() {
         m_need_calculate = false;
     }
 
+    m_param_changed = false;
+    m_old_context = KData();
+
     try {
         result = shared_from_this();
     } catch (const std::exception &e) {
@@ -1023,13 +1024,13 @@ Indicator IndicatorImp::calculate() {
         }
     }
 
-    m_old_context = KData();
     return Indicator(result);
 }
 
 size_t IndicatorImp::increment_execute() {
     size_t null_pos = Null<size_t>();
-    if (!ms_enable_increment_calculate || m_right->m_need_calculate || m_left->m_need_calculate) {
+    if (m_param_changed || !ms_enable_increment_calculate || m_right->m_need_calculate ||
+        m_left->m_need_calculate) {
         return null_pos;
     }
 
@@ -1037,29 +1038,51 @@ size_t IndicatorImp::increment_execute() {
         return null_pos;
     }
 
-    size_t start_pos = m_old_context.getPos(m_context.front().datetime);
-    if (start_pos == null_pos) {
+    size_t copy_start_pos = m_old_context.getPos(m_context.front().datetime);
+    if (copy_start_pos == null_pos) {
         return null_pos;
     }
 
     size_t total = m_context.size();
-    size_t copy_len = m_old_context.size() - start_pos;
-    HKU_ASSERT(copy_len <= total);
-
-    for (size_t r = 0; r < m_result_num; ++r) {
-        if (m_pBuffer[r] == nullptr) {
-            return null_pos;
-        }
-        m_pBuffer[r]->resize(total);
-        auto *dst = this->data(r);
-        memmove(dst, dst + start_pos, sizeof(value_t) * (copy_len));
-    }
-
-    start_pos = m_context.getPos(m_old_context.back().datetime);
-    if (start_pos == Null<size_t>()) {
+    size_t copy_len = m_old_context.size() - copy_start_pos;
+    if (copy_len == 0) {
         return null_pos;
     }
 
+    size_t start_pos = m_context.getPos(m_old_context.back().datetime);
+    if (start_pos == null_pos) {
+        return null_pos;
+    }
+
+    if (copy_start_pos < m_discard) {
+        size_t old_discard = m_discard;
+        m_discard = m_discard - copy_start_pos;
+        copy_start_pos = old_discard;
+        copy_len = m_old_context.size() - copy_start_pos;
+        for (size_t r = 0; r < m_result_num; ++r) {
+            if (m_pBuffer[r] == nullptr) {
+                return false;
+            }
+            m_pBuffer[r]->resize(total, Null<value_t>());
+            auto *dst = this->data(r);
+            memmove(dst + m_discard, dst + copy_start_pos, sizeof(value_t) * (copy_len));
+        }
+    } else {
+        for (size_t r = 0; r < m_result_num; ++r) {
+            if (m_pBuffer[r] == nullptr) {
+                return false;
+            }
+            m_pBuffer[r]->resize(total, Null<value_t>());
+            auto *dst = this->data(r);
+            memmove(dst, dst + copy_start_pos, sizeof(value_t) * (copy_len));
+        }
+    }
+
+    if (start_pos < m_discard) {
+        start_pos = m_discard;
+    }
+
+    _update_discard();
     return start_pos;
 }
 
@@ -1092,11 +1115,12 @@ void IndicatorImp::execute_weave() {
             result_number = MAX_RESULT_NUM;
         }
         _readyBuffer(total, result_number);
-        setDiscard(discard);
         start_pos = discard;
     } else if (start_pos < discard) {
         start_pos = discard;
     }
+
+    setDiscard(discard);
 
     value_t const *src = nullptr;
     value_t *dst = nullptr;
@@ -1161,11 +1185,12 @@ void IndicatorImp::execute_add() {
     if (start_pos == Null<size_t>()) {
         size_t result_number = std::min(minp->getResultNumber(), maxp->getResultNumber());
         _readyBuffer(total, result_number);
-        setDiscard(discard);
         start_pos = discard;
     } else if (start_pos < discard) {
         start_pos = discard;
     }
+
+    setDiscard(discard);
 
     for (size_t r = 0; r < m_result_num; ++r) {
         auto const *data1 = maxp->data(r);
@@ -1203,11 +1228,12 @@ void IndicatorImp::execute_sub() {
     if (start_pos == Null<size_t>()) {
         size_t result_number = std::min(minp->getResultNumber(), maxp->getResultNumber());
         _readyBuffer(total, result_number);
-        setDiscard(discard);
         start_pos = discard;
     } else if (start_pos < discard) {
         start_pos = discard;
     }
+
+    setDiscard(discard);
 
     if (m_left->size() > m_right->size()) {
         for (size_t r = 0; r < m_result_num; ++r) {
@@ -1256,11 +1282,12 @@ void IndicatorImp::execute_mul() {
     if (start_pos == Null<size_t>()) {
         size_t result_number = std::min(minp->getResultNumber(), maxp->getResultNumber());
         _readyBuffer(total, result_number);
-        setDiscard(discard);
         start_pos = discard;
     } else if (start_pos < discard) {
         start_pos = discard;
     }
+
+    setDiscard(discard);
 
     for (size_t r = 0; r < m_result_num; ++r) {
         auto const *data1 = maxp->data(r);
@@ -1298,11 +1325,12 @@ void IndicatorImp::execute_div() {
     if (start_pos == Null<size_t>()) {
         size_t result_number = std::min(minp->getResultNumber(), maxp->getResultNumber());
         _readyBuffer(total, result_number);
-        setDiscard(discard);
         start_pos = discard;
     } else if (start_pos < discard) {
         start_pos = discard;
     }
+
+    setDiscard(discard);
 
     if (m_left->size() > m_right->size()) {
         for (size_t r = 0; r < m_result_num; ++r) {
@@ -1351,11 +1379,12 @@ void IndicatorImp::execute_mod() {
     if (start_pos == Null<size_t>()) {
         size_t result_number = std::min(minp->getResultNumber(), maxp->getResultNumber());
         _readyBuffer(total, result_number);
-        setDiscard(discard);
         start_pos = discard;
     } else if (start_pos < discard) {
         start_pos = discard;
     }
+
+    setDiscard(discard);
 
     value_t *dst = nullptr;
     value_t const *left = nullptr;
@@ -1416,11 +1445,12 @@ void IndicatorImp::execute_eq() {
     if (start_pos == Null<size_t>()) {
         size_t result_number = std::min(minp->getResultNumber(), maxp->getResultNumber());
         _readyBuffer(total, result_number);
-        setDiscard(discard);
         start_pos = discard;
     } else if (start_pos < discard) {
         start_pos = discard;
     }
+
+    setDiscard(discard);
 
     for (size_t r = 0; r < m_result_num; ++r) {
         auto *dst = this->data(r);
@@ -1458,11 +1488,12 @@ void IndicatorImp::execute_ne() {
     if (start_pos == Null<size_t>()) {
         size_t result_number = std::min(minp->getResultNumber(), maxp->getResultNumber());
         _readyBuffer(total, result_number);
-        setDiscard(discard);
         start_pos = discard;
     } else if (start_pos < discard) {
         start_pos = discard;
     }
+
+    setDiscard(discard);
 
     for (size_t r = 0; r < m_result_num; ++r) {
         auto *dst = this->data(r);
@@ -1500,11 +1531,12 @@ void IndicatorImp::execute_gt() {
     if (start_pos == Null<size_t>()) {
         size_t result_number = std::min(minp->getResultNumber(), maxp->getResultNumber());
         _readyBuffer(total, result_number);
-        setDiscard(discard);
         start_pos = discard;
     } else if (start_pos < discard) {
         start_pos = discard;
     }
+
+    setDiscard(discard);
 
     value_t *dst = nullptr;
     value_t const *left = nullptr;
@@ -1556,11 +1588,12 @@ void IndicatorImp::execute_lt() {
     if (start_pos == Null<size_t>()) {
         size_t result_number = std::min(minp->getResultNumber(), maxp->getResultNumber());
         _readyBuffer(total, result_number);
-        setDiscard(discard);
         start_pos = discard;
     } else if (start_pos < discard) {
         start_pos = discard;
     }
+
+    setDiscard(discard);
 
     value_t *dst = nullptr;
     value_t const *left = nullptr;
@@ -1612,11 +1645,12 @@ void IndicatorImp::execute_ge() {
     if (start_pos == Null<size_t>()) {
         size_t result_number = std::min(minp->getResultNumber(), maxp->getResultNumber());
         _readyBuffer(total, result_number);
-        setDiscard(discard);
         start_pos = discard;
     } else if (start_pos < discard) {
         start_pos = discard;
     }
+
+    setDiscard(discard);
 
     value_t *dst = nullptr;
     value_t const *left = nullptr;
@@ -1668,11 +1702,12 @@ void IndicatorImp::execute_le() {
     if (start_pos == Null<size_t>()) {
         size_t result_number = std::min(minp->getResultNumber(), maxp->getResultNumber());
         _readyBuffer(total, result_number);
-        setDiscard(discard);
         start_pos = discard;
     } else if (start_pos < discard) {
         start_pos = discard;
     }
+
+    setDiscard(discard);
 
     value_t *dst = nullptr;
     value_t const *left = nullptr;
@@ -1724,11 +1759,12 @@ void IndicatorImp::execute_and() {
     if (start_pos == Null<size_t>()) {
         size_t result_number = std::min(minp->getResultNumber(), maxp->getResultNumber());
         _readyBuffer(total, result_number);
-        setDiscard(discard);
         start_pos = discard;
     } else if (start_pos < discard) {
         start_pos = discard;
     }
+
+    setDiscard(discard);
 
     for (size_t r = 0; r < m_result_num; ++r) {
         auto *dst = this->data(r);
@@ -1766,11 +1802,12 @@ void IndicatorImp::execute_or() {
     if (start_pos == Null<size_t>()) {
         size_t result_number = std::min(minp->getResultNumber(), maxp->getResultNumber());
         _readyBuffer(total, result_number);
-        setDiscard(discard);
         start_pos = discard;
     } else if (start_pos < discard) {
         start_pos = discard;
     }
+
+    setDiscard(discard);
 
     for (size_t r = 0; r < m_result_num; ++r) {
         auto *dst = this->data(r);
@@ -1784,7 +1821,8 @@ void IndicatorImp::execute_or() {
 
 size_t IndicatorImp::increment_execute_if() {
     size_t null_pos = Null<size_t>();
-    if (m_three->m_need_calculate || m_right->m_need_calculate || m_left->m_need_calculate) {
+    if (m_param_changed || !ms_enable_increment_calculate || m_three->m_need_calculate ||
+        m_right->m_need_calculate || m_left->m_need_calculate) {
         return null_pos;
     }
 
@@ -1792,29 +1830,51 @@ size_t IndicatorImp::increment_execute_if() {
         return null_pos;
     }
 
-    size_t start_pos = m_old_context.getPos(m_context.front().datetime);
-    if (start_pos == null_pos) {
+    size_t copy_start_pos = m_old_context.getPos(m_context.front().datetime);
+    if (copy_start_pos == null_pos) {
         return null_pos;
     }
 
     size_t total = m_context.size();
-    size_t copy_len = m_old_context.size() - start_pos;
-    HKU_ASSERT(copy_len <= total);
-
-    for (size_t r = 0; r < m_result_num; ++r) {
-        if (m_pBuffer[r] == nullptr) {
-            return null_pos;
-        }
-        m_pBuffer[r]->resize(total);
-        auto *dst = this->data(r);
-        memmove(dst, dst + start_pos, sizeof(value_t) * (copy_len));
-    }
-
-    start_pos = m_context.getPos(m_old_context.back().datetime);
-    if (start_pos == Null<size_t>()) {
+    size_t copy_len = m_old_context.size() - copy_start_pos;
+    if (copy_len == 0) {
         return null_pos;
     }
 
+    size_t start_pos = m_context.getPos(m_old_context.back().datetime);
+    if (start_pos == null_pos) {
+        return null_pos;
+    }
+
+    if (copy_start_pos < m_discard) {
+        size_t old_discard = m_discard;
+        m_discard = m_discard - copy_start_pos;
+        copy_start_pos = old_discard;
+        copy_len = m_old_context.size() - copy_start_pos;
+        for (size_t r = 0; r < m_result_num; ++r) {
+            if (m_pBuffer[r] == nullptr) {
+                return false;
+            }
+            m_pBuffer[r]->resize(total, Null<value_t>());
+            auto *dst = this->data(r);
+            memmove(dst + m_discard, dst + copy_start_pos, sizeof(value_t) * (copy_len));
+        }
+    } else {
+        for (size_t r = 0; r < m_result_num; ++r) {
+            if (m_pBuffer[r] == nullptr) {
+                return false;
+            }
+            m_pBuffer[r]->resize(total, Null<value_t>());
+            auto *dst = this->data(r);
+            memmove(dst, dst + copy_start_pos, sizeof(value_t) * (copy_len));
+        }
+    }
+
+    if (start_pos < m_discard) {
+        start_pos = m_discard;
+    }
+
+    _update_discard();
     return start_pos;
 }
 
@@ -1858,10 +1918,11 @@ void IndicatorImp::execute_if() {
     if (start_pos == Null<size_t>()) {
         size_t result_number = std::min(minp->getResultNumber(), maxp->getResultNumber());
         _readyBuffer(total, result_number);
-        setDiscard(discard);
     } else if (start_pos > discard) {
         discard = start_pos;
     }
+
+    setDiscard(discard);
 
     auto *left = m_left->data(0);
     auto *right = m_right->data(0);
@@ -1943,8 +2004,10 @@ void IndicatorImp::_dyn_calculate(const Indicator &ind) {
     _update_discard();
 }
 
-void IndicatorImp::_update_discard() {
-    m_discard = 0;
+void IndicatorImp::_update_discard(bool force) {
+    if (force) {
+        m_discard = 0;
+    }
     size_t total = size();
     for (size_t result_index = 0; result_index < m_result_num; result_index++) {
         size_t discard = m_discard;
@@ -1958,6 +2021,9 @@ void IndicatorImp::_update_discard() {
         if (discard > m_discard) {
             m_discard = discard;
         }
+    }
+    if (m_discard > total) {
+        m_discard = total;
     }
 }
 

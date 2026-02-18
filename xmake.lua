@@ -3,7 +3,7 @@ set_xmakever("3.0.0")
 -- project
 set_project("hikyuu")
 
-add_rules("mode.debug", "mode.release")
+add_rules("mode.debug", "mode.release", "mode.coverage")
 
 -- version
 set_version("2.7.3", {build = "%Y%m%d%H%M"})
@@ -189,6 +189,11 @@ add_requires("nlohmann_json", {system = false})
 add_requires("eigen", {system = false})
 add_requires("xxhash", {system = false})
 add_requires("utf8proc 2.11.0", {system = false})
+
+add_requires("openmp", {system = false})
+if is_plat("macosx") then 
+    add_requires("libomp", {system = false})
+end
 
 if has_config("http_client_zip") then
     add_requires("gzip-hpp", {system = false})
