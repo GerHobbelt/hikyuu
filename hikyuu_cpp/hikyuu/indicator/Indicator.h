@@ -93,6 +93,9 @@ public:
     /** 设置抛弃的个数，如果小于原有的discard则无效 */
     void setDiscard(size_t discard) noexcept;
 
+    /** 根据自身数值，更新抛弃的个数, force=true则强制更新, 否则从当前自身的 discard() 开始更新 */
+    void updateDiscard(bool force = false) noexcept;
+
     /** 返回有几个结果集输出 */
     size_t getResultNumber() const noexcept;
 
@@ -305,6 +308,12 @@ inline void Indicator::setDiscard(size_t discard) noexcept {
     }
 }
 
+inline void Indicator::updateDiscard(bool force) noexcept {
+    if (m_imp) {
+        m_imp->updateDiscard(force);
+    }
+}
+
 inline size_t Indicator::getResultNumber() const noexcept {
     return m_imp ? m_imp->getResultNumber() : 0;
 }
@@ -481,6 +490,32 @@ Indicator HKU_API IF(const Indicator& x, const Indicator& a, const Indicator& b)
 Indicator HKU_API IF(const Indicator& x, Indicator::value_t a, const Indicator& b);
 Indicator HKU_API IF(const Indicator& x, const Indicator& a, Indicator::value_t b);
 Indicator HKU_API IF(const Indicator& x, Indicator::value_t a, Indicator::value_t b);
+
+/**
+ * 组合计算多个指标
+ * @details
+ * 将多个指标组合在一起进行统一计算，自动处理指标间的依赖关系和上下文设置。
+ * 该函数会获取所有输入指标的所有子节点并去重，然后为每个指标设置指定的K线数据上下文，
+ * 最后执行计算并返回结果。
+ *
+ * <pre>
+ * 用法示例：
+ * IndicatorList inds = {MA(CLOSE(), 5), MA(CLOSE(), 10), MACD(CLOSE())};
+ * IndicatorList results = combineCalculateIndicators(inds, kdata);
+ * // results 包含所有计算后的指标结果
+ *
+ * // 只获取第一个结果列
+ * IndicatorList first_results = combineCalculateIndicators(inds, kdata, true);
+ * </pre>
+ *
+ * @param indicators 指标列表，需要进行组合计算的指标集合
+ * @param kdata K线数据上下文，用于设置指标计算的环境
+ * @param tovalue 是否只返回第一个结果列，默认为false（返回所有结果列）
+ * @return IndicatorList 计算后的指标结果列表
+ * @ingroup Indicator
+ */
+IndicatorList HKU_API combineCalculateIndicators(const IndicatorList& indicators,
+                                                 const KData& kdata, bool tovalue = false);
 
 } /* namespace hku */
 

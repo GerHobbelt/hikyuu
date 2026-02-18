@@ -9,11 +9,11 @@
 #ifndef INDICATORIMP_H_
 #define INDICATORIMP_H_
 
-#include <mimalloc.h>
 #include "../config.h"
 #include "../KData.h"
 #include "../utilities/Parameter.h"
 #include "../utilities/thread/thread.h"
+#include "IndicatorImpBuffer.h"
 
 namespace hku {
 
@@ -22,6 +22,9 @@ namespace hku {
 class HKU_API Indicator;
 class HKU_API IndParam;
 
+vector<Indicator> HKU_API combineCalculateIndicators(const vector<Indicator>& indicators,
+                                                     const KData& kdata, bool tovalue);
+
 /**
  * 指标实现类，定义新指标时，应从此类继承
  * @ingroup Indicator
@@ -29,6 +32,10 @@ class HKU_API IndParam;
 class HKU_API IndicatorImp : public enable_shared_from_this<IndicatorImp> {
     PARAMETER_SUPPORT_WITH_CHECK
     friend HKU_API std::ostream& operator<<(std::ostream& os, const IndicatorImp& imp);
+
+    typedef vector<Indicator> IndicatorList;
+    friend IndicatorList HKU_API combineCalculateIndicators(const IndicatorList& indicators,
+                                                            const KData& kdata, bool tovalue);
 
 public:
     enum OPType : uint8_t {
@@ -52,12 +59,8 @@ public:
         INVALID
     };
 
-#if HKU_USE_LOW_PRECISION
-    typedef float value_t;
-#else
-    typedef double value_t;
-#endif
-    typedef vector<value_t, mi_stl_allocator<value_t>> buffer_t;
+    typedef IndicatorImpBuffer::value_type value_t;
+    typedef IndicatorImpBuffer buffer_t;
 
 public:
     /** 默认构造函数   */
@@ -76,6 +79,7 @@ public:
     size_t discard() const noexcept;
 
     void setDiscard(size_t discard) noexcept;
+    void updateDiscard(bool force = false) noexcept;
 
     size_t size() const noexcept;
 
@@ -284,9 +288,6 @@ protected:
     static size_t _get_step_start(size_t pos, size_t step, size_t discard);
 
     void onlySetContext(const KData&);
-
-    // 用于动态参数时，更新 discard
-    void _update_discard(bool force = false);
 
 protected:
     string m_name;

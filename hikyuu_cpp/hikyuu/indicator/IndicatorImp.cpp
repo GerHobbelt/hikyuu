@@ -16,6 +16,10 @@
 #include "imp/ICval.h"
 #include "imp/IContext.h"
 
+#if HKU_ENABLE_MIMALLOC
+#include <mimalloc.h>
+#endif
+
 #if HKU_SUPPORT_SERIALIZATION
 BOOST_CLASS_EXPORT(hku::IndicatorImp)
 #endif
@@ -25,16 +29,22 @@ namespace hku {
 bool IndicatorImp::ms_enable_increment_calculate{true};
 
 void IndicatorImp::initEngine() {
+#if HKU_ENABLE_MIMALLOC
     mi_option_enable(mi_option_large_os_pages);  // 启用大页面
     mi_option_enable(mi_option_use_numa_nodes);  // 启用NUMA支持
-    mi_option_set(mi_option_purge_delay, 0);
+    // mi_option_set(mi_option_purge_delay, 0);
+    // mi_option_set(mi_option_purge_delay, 100);
+    // mi_option_disable(mi_option_purge_decommits);
 
     mi_stats_reset();
-    // mi_stats_print(NULL);
+// mi_stats_print(NULL);
+#endif
 }
 
 void IndicatorImp::releaseEngine() {
-    // mi_stats_print(NULL);
+#if HKU_ENABLE_MIMALLOC
+// mi_stats_print(NULL);
+#endif
 }
 
 string HKU_API getOPTypeName(IndicatorImp::OPType op) {
@@ -489,6 +499,7 @@ IndicatorImpPtr IndicatorImp::getResult(size_t result_num) {
     size_t total = size();
     imp->_readyBuffer(total, 1);
     imp->setDiscard(discard());
+    imp->name(name());
     auto const *src = this->data(result_num);
     auto *dst = imp->data(0);
     for (size_t i = discard(); i < total; ++i) {
@@ -884,7 +895,7 @@ bool IndicatorImp::increment_execute_leaf_or_op(const Indicator &ind) {
         _increment_calculate(ind, start_pos);
     }
 
-    _update_discard();
+    updateDiscard();
     return true;
 }
 
@@ -1906,7 +1917,7 @@ void IndicatorImp::_dyn_calculate(const Indicator &ind) {
                 _dyn_run_one_step(ind, i, step);
             }
         }
-        _update_discard();
+        updateDiscard();
         return;
     }
 
@@ -1922,10 +1933,10 @@ void IndicatorImp::_dyn_calculate(const Indicator &ind) {
       },
       minCircleLength);
 
-    _update_discard();
+    updateDiscard();
 }
 
-void IndicatorImp::_update_discard(bool force) {
+void IndicatorImp::updateDiscard(bool force) noexcept {
     if (force) {
         m_discard = 0;
     }

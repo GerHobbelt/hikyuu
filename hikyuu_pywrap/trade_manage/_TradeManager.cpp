@@ -592,12 +592,14 @@ void export_TradeManager(py::module& m) {
 
       .def("get_performance", &TradeManagerBase::getPerformance,
            py::arg("datetime") = Datetime::now(), py::arg("ktype") = KQuery::DAY,
+           py::arg("ext") = true,
            R"(get_performance(self[, datetime=Datetime.now(), ktype=Query.DAY]) -> Performance)
         
     获取账户指定时刻的账户表现
 
     :param Datetime datetime: 指定时刻
     :param Query.KType ktype: K线类型
+    :param bool ext: 是否获取扩展统计项(需VIP权限)，否则仍旧为基础统计项
     :return: 账户表现)")
 
       .def("get_max_pull_back", &TradeManagerBase::getMaxPullBack,
@@ -654,13 +656,4 @@ void export_TradeManager(py::module& m) {
     :return: 账户收益百分比（年度）)")
 
         DEF_PICKLE(TradeManagerPtr);
-
-    m.def("get_funds_list", &getFundsList,
-          R"(get_funds_list(tm_list: list, ref_dates: DatetimeList) -> list[Funds])
-    
-    一次性从多个账户中获取多个指定时刻的账户资金信息
-
-    :param list tm_list: 账户列表
-    :param DatetimeList ref_dates: 获取时刻列表
-    :return: 账户资金列表)");
 }

@@ -16,9 +16,19 @@ BOOST_CLASS_EXPORT(hku::TradeManagerBase)
 
 namespace hku {
 
-Performance TradeManagerBase::getPerformance(const Datetime& datetime, const KQuery::KType& ktype) {
+FundsList TradeManagerBase::getFundsList(const DatetimeList& dates, const KQuery::KType& ktype) {
+    size_t total = dates.size();
+    FundsList result;
+    HKU_IF_RETURN(total == 0, result);
+    result = global_parallel_for_index(
+      0, total, [&, this](size_t i) -> FundsRecord { return getFunds(dates[i], ktype); });
+    return result;
+}
+
+Performance TradeManagerBase::getPerformance(const Datetime& datetime, const KQuery::KType& ktype,
+                                             bool ext) {
     Performance ret;
-    if (isValidLicense()) {
+    if (ext && isValidLicense()) {
         auto& sm = StockManager::instance();
         auto* plugin = sm.getPlugin<TMReportPluginInterface>(HKU_PLUGIN_TMREPORT);
         HKU_ERROR_IF_RETURN(!plugin, ret, "Can't find {} plugin!", HKU_PLUGIN_TMREPORT);
@@ -77,17 +87,6 @@ std::vector<std::pair<Datetime, double>> TradeManagerBase::getProfitPercentYearl
     HKU_ERROR_IF_RETURN(!plugin, ret, "Can't find {} plugin!", HKU_PLUGIN_TMREPORT);
     ret = plugin->getProfitPercentYearly(shared_from_this(), datetime);
     return ret;
-}
-
-vector<FundsList> HKU_API getFundsList(const vector<TMPtr>& tm_list,
-                                       const DatetimeList& ref_dates) {
-    return global_parallel_for_index(0, tm_list.size(), [&](size_t i) {
-        FundsList funds;
-        if (tm_list[i]) {
-            funds = tm_list[i]->getFundsList(ref_dates);
-        }
-        return funds;
-    });
 }
 
 }  // namespace hku

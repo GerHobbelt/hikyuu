@@ -81,14 +81,14 @@ bool Performance::exist(const string& key) {
     return ret;
 }
 
-Performance& Performance::operator=(const Performance& other) {
+Performance& Performance::operator=(const Performance& other) noexcept {
     HKU_IF_RETURN(this == &other, *this);
     m_result = other.m_result;
     m_keys = other.m_keys;
     return *this;
 }
 
-Performance& Performance::operator=(Performance&& other) {
+Performance& Performance::operator=(Performance&& other) noexcept {
     HKU_IF_RETURN(this == &other, *this);
     m_result = std::move(other.m_result);
     m_keys = std::move(other.m_keys);
@@ -153,8 +153,7 @@ void Performance::statistics(const TradeManagerPtr& tm, const Datetime& datetime
     reset();
 
     HKU_INFO_IF_RETURN(!tm, void(), "TradeManagerPtr is Null!");
-    HKU_ERROR_IF_RETURN(datetime.isNull(), void(), "Invalid input datetime");
-    HKU_ERROR_IF_RETURN(datetime < tm->lastDatetime(), void(),
+    HKU_ERROR_IF_RETURN(!datetime.isNull() && datetime < tm->lastDatetime(), void(),
                         "datetime must >= tm->lastDatetime !");
 
     int precision = tm->precision();
