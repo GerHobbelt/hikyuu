@@ -157,7 +157,7 @@ public:
 
     /** 获取K线数据类型 */
     // KType kType() const { return m_dataType; }
-    string kType() const {
+    const string& kType() const {
         return m_dataType;
     }
 
@@ -191,7 +191,7 @@ public:
     static string getQueryTypeName(QueryType);
 
     /** 获取KType名称，用于显示输出 */
-    static string getKTypeName(KType);
+    static string getKTypeName(const KType&);
 
     /** 获取recoverType名称，用于显示输出 */
     static string getRecoverTypeName(RecoverType);

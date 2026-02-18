@@ -131,7 +131,7 @@ void StockManager::init(const Parameter& baseInfoParam, const Parameter& blockPa
         auto* plugin = getPlugin<DataDriverPluginInterface>(HKU_PLUGIN_CLICKHOUSE_DRIVER);
         HKU_CHECK(plugin, "Can not find {} plugin!", HKU_PLUGIN_CLICKHOUSE_DRIVER);
         auto kdriver = plugin->getKDataDriver();
-        HKU_CHECK(kdriver, "Can not get clickhouse driver! Check your license!");
+        HKU_CHECK(kdriver, htr("Can not get clickhouse driver! Check your license!"));
         DataDriverFactory::regKDataDriver(kdriver);
     }
 
@@ -490,6 +490,10 @@ StringList StockManager::getAllMarket() const {
         result.push_back(iter->first);
     }
     return result;
+}
+
+StringList StockManager::getAllCategory() {
+    return m_blockDriver ? m_blockDriver->getAllCategory() : StringList();
 }
 
 Block StockManager::getBlock(const string& category, const string& name) {

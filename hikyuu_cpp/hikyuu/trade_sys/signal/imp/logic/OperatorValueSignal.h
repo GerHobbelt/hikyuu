@@ -42,18 +42,18 @@ protected:
 #endif
 };
 
-#define OPERATOR_SIGNAL_IMP(classname, name)                                               \
+#define OPERATOR_VALUE_SIGNAL_IMP(classname, name)                                         \
 public:                                                                                    \
     classname() : OperatorValueSignal(name) {}                                             \
     classname(const SignalPtr& sg, double value) : OperatorValueSignal(name, sg, value) {} \
-    virtual ~classname() {}                                                                \
+    virtual ~classname() override {}                                                       \
     virtual SignalPtr _clone() override {                                                  \
         return make_shared<classname>(m_sg, m_value);                                      \
     }                                                                                      \
     virtual void _calculate(const KData&) override;
 
 #if HKU_SUPPORT_SERIALIZATION
-#define OPERATOR_SIGNAL_NO_PRIVATE_MEMBER_SERIALIZATION               \
+#define OPERATOR_VALUE_SIGNAL_NO_PRIVATE_MEMBER_SERIALIZATION         \
 private:                                                              \
     friend class boost::serialization::access;                        \
     template <class Archive>                                          \
@@ -62,7 +62,7 @@ private:                                                              \
         ar& BOOST_SERIALIZATION_BASE_OBJECT_NVP(OperatorValueSignal); \
     }
 #else
-#define OPERATOR_SIGNAL_NO_PRIVATE_MEMBER_SERIALIZATION
+#define OPERATOR_VALUE_SIGNAL_NO_PRIVATE_MEMBER_SERIALIZATION
 #endif
 
 } /* namespace hku */

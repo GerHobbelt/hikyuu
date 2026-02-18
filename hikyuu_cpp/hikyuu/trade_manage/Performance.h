@@ -6,13 +6,14 @@
  */
 
 #pragma once
-#ifndef PERFORMANCE_H_
-#define PERFORMANCE_H_
 
-#include <boost/function.hpp>
 #include "TradeManagerBase.h"
 
 namespace hku {
+
+#if defined(_MSC_VER)
+#pragma warning(disable : 4251)
+#endif
 
 /**
  * 简单绩效统计
@@ -84,4 +85,3 @@ private:
 };
 
 } /* namespace hku */
-#endif /* PERFORMANCE_H_ */

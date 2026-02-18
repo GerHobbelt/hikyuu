@@ -9,6 +9,7 @@
 #ifndef SYSTEMBASE_H_
 #define SYSTEMBASE_H_
 
+#include <nlohmann/json.hpp>
 // #include "../../KData.h"
 // #include "../../utilities/Parameter.h"
 // #include "../../trade_manage/TradeManager.h"
@@ -24,6 +25,8 @@
 #include "../../serialization/KData_serialization.h"
 
 namespace hku {
+
+using json = nlohmann::json;
 
 class HKU_API Portfolio;
 class HKU_API AllocateFundsBase;
@@ -181,6 +184,11 @@ public:
     void setTO(const KData& kdata);
 
     /**
+     * 回测完成后，返回最后一天交易记录，以及需要延迟的买入和卖出延迟请求
+     */
+    json lastSuggestion() const;
+
+    /**
      * @brief 不指定stock的方式下run，需要事先通过setStock设定stock
      * @param query 查询条件
      * @param reset 执行前是否依据系统部件共享属性复位
@@ -211,6 +219,9 @@ public:
      * @return TradeRecord
      */
     virtual TradeRecord runMoment(const Datetime& datetime);
+
+    virtual TradeRecord runMomentOnOpen(const Datetime& datetime);
+    virtual TradeRecord runMomentOnClose(const Datetime& datetime);
 
     // 运行前准备工作, 失败将抛出异常
     virtual void readyForRun();
@@ -318,7 +329,9 @@ private:
 
     TradeRecord _processRequest(const KRecord& today, const KRecord& src_today);
 
-    TradeRecord _runMoment(const KRecord& record, const KRecord& src_record);
+    TradeRecord _runMoment(const KRecord& today, const KRecord& src_today);
+    TradeRecord _runMomentOnOpen(const KRecord& today, const KRecord& src_today);
+    TradeRecord _runMomentOnClose(const KRecord& today, const KRecord& src_today);
 
     // Portfolio | AllocateFunds 指示立即进行强制卖出，以便对 buy_delay 的系统进行资金调整
     TradeRecord _sellForce(const Datetime& date, double num, Part from, bool on_open);
@@ -445,16 +458,6 @@ typedef vector<SystemPtr> SystemList;
 
 HKU_API std::ostream& operator<<(std::ostream& os, const System& sys);
 HKU_API std::ostream& operator<<(std::ostream& os, const SystemPtr& sys);
-
-/**
- * @brief 并行运行系统
- * @param system_list 系统列表
- * @param query 系统运行查询条件
- * @param reset 执行前是否依据系统部件共享属性复位
- * @param resetAll 强制复位所有部件
- */
-void HKU_API parallel_run_sys(const SystemList& system_list, const KQuery& query, bool reset = true,
-                              bool resetAll = false);
 
 inline const string& System::name() const {
     return m_name;
