@@ -20,6 +20,7 @@ MultiFactorSelector2::MultiFactorSelector2() : SelectorBase("SE_MultiFactor2") {
     setParam<Stock>("ref_stk", Stock());
     setParam<bool>("use_spearman", true);
     setParam<string>("mode", "MF_ICIRWeight");
+    setParam<int>("mf_recover_type", KQuery::INVALID_RECOVER_TYPE);  // 指定MF的计算时的复权方式
 }
 
 MultiFactorSelector2::MultiFactorSelector2(const MFPtr& mf) : SelectorBase("SE_MultiFactor2") {
@@ -34,6 +35,7 @@ MultiFactorSelector2::MultiFactorSelector2(const MFPtr& mf) : SelectorBase("SE_M
     }
     setParam<bool>("use_spearman", mf->getParam<bool>("use_spearman"));
     setParam<string>("mode", "CUSTOM");
+    setParam<int>("mf_recover_type", KQuery::INVALID_RECOVER_TYPE);  // 指定MF的计算时的复权方式
     setIndicators(mf->getRefIndicators());
 }
 
@@ -48,6 +50,10 @@ void MultiFactorSelector2::_checkParam(const string& name) const {
         auto mode = getParam<string>("mode");
         HKU_ASSERT("MF_ICIRWeight" == mode || "MF_ICWeight" == mode || "MF_EqualWeight" == mode ||
                    "CUSTOM" == mode);
+    } else if ("mf_recover_type" == name) {
+        int recover_type = getParam<int>("mf_recover_type");
+        HKU_ASSERT(recover_type >= KQuery::NO_RECOVER &&
+                   recover_type <= KQuery::INVALID_RECOVER_TYPE);
     }
 }
 
@@ -83,16 +89,16 @@ SystemWeightList MultiFactorSelector2::_getSelected(Datetime date) {
 
 void MultiFactorSelector2::_calculate() {
     Stock ref_stk = getParam<Stock>("ref_stk");
-    if (ref_stk.isNull()) {
-        ref_stk = getStock("sh000300");
-    }
-
     StockList stks;
     for (const auto& sys : m_pro_sys_list) {
         stks.emplace_back(sys->getStock());
     }
 
-    const auto& query = m_query;
+    KQuery query = m_query;
+    if (getParam<int>("mf_recover_type") != KQuery::INVALID_RECOVER_TYPE) {
+        query.recoverType(static_cast<KQuery::RecoverType>(getParam<int>("mf_recover_type")));
+    }
+
     auto ic_n = getParam<int>("ic_n");
     auto ic_rolling_n = getParam<int>("ic_rolling_n");
     bool spearman = getParam<bool>("use_spearman");
@@ -119,6 +125,8 @@ void MultiFactorSelector2::_calculate() {
             m_mf->setParam<int>("ic_rolling_n", ic_rolling_n);
         }
     }
+
+    m_mf->calculate();
 
     for (const auto& sys : m_real_sys_list) {
         m_stk_sys_dict.insert({sys->getStock(), sys});
