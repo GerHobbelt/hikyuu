@@ -320,10 +320,10 @@ def import_one_stock_data(
             today.year * 10000 + today.month * 100 + today.day
         ) * 10000 + 1500
     else:
-        return (0, True, last_datetime)
+        return (0, True, Datetime(last_datetime))
 
     if today_datetime <= last_datetime:
-        return (0, True, last_datetime)
+        return (0, True, Datetime(last_datetime))
 
     get_bars = (
         api.get_index_bars if stktype == STOCKTYPE.INDEX else api.get_security_bars
@@ -512,6 +512,9 @@ def import_data(
 
     connect.commit()
 
+    if total > 0 and progress:
+        progress(total, total)
+
     if 0 < failed_count < failed_limit and is_valid_license():
         # 删除最后记录
         ktype_dict = {
@@ -523,8 +526,9 @@ def import_data(
         h5_importer = get_mysql_importer(market, nktype)
         if h5_importer is not None:
             for r in failed_list:
-                hku_info("remove {}{} {}: {}", r[0], r[1], nktype, r[2].start_of_day())
+                hku_warn("remove {}{} {}: {}", r[0], r[1], nktype, r[2].start_of_day())
                 h5_importer.remove(r[0], r[1], nktype, r[2].start_of_day())
+            hku_warn(f"已清理 {market} {failed_count} 个失败股票的最后记录，建议重新导入")
 
     if failed_count >= failed_limit:
         hku_error(f"{market} {ktype} 连续失败20个股票，已停止导入, 建议重新导入")

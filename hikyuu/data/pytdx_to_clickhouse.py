@@ -335,7 +335,7 @@ def import_one_stock_data(
                 if abs(last_krecord[4] - bar["close"]) / last_krecord[4] > 0.01:
                     hku_error(
                         f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord close: {last_krecord[4]}, bar: {bar['close']}")
-                    return (0, False, last_datetime)
+                    return (0, False, Datetime(last_datetime))
                 if ktype == 'DAY' and last_krecord[5] != 0.0 and abs(last_krecord[5] - bar["amount"]) > 10000:
                     hku_error(
                         f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord amount: {last_krecord[5]}, bar: {bar['amount']}")
@@ -545,8 +545,9 @@ def import_data(
         ch_importer = get_clickhouse_importer()
         if ch_importer is not None:
             for r in failed_list:
-                hku_info(f"remove {r[0]} {r[1]} {nktype} {r[2].start_of_day()}")
+                hku_warn(f"清理 {r[0]} {r[1]} {nktype} {r[2].start_of_day()}")
                 ch_importer.remove(r[0], r[1], nktype, r[2].start_of_day())
+            hku_warn(f"已清理 {market} {failed_count} 个失败股票的最后记录，建议重新导入")
 
     if failed_count >= failed_limit:
         hku_error(f"{market} {ktype} 连续失败20个股票，已停止导入, 建议重新导入")
