@@ -11,9 +11,6 @@ target("core")
 
     add_deps("hikyuu")
     add_packages("boost", "fmt", "spdlog", "flatbuffers", "pybind11", "utf8proc", "nlohmann_json")
-    if has_config("arrow") then
-        add_packages("arrow")
-    end
     if is_plat("windows") then
         set_filename("core.pyd")
         add_cxflags("/bigobj")
@@ -49,7 +46,7 @@ target("core")
 
     -- set_policy("build.optimization.lto", true)
     add_rules("c++.unity_build", {batchsize = 0})
-    add_files("./**.cpp|views/**.cpp")
+    add_files("./**.cpp")
 
     add_files("./*.cpp", {unity_group="base"})
     add_files("./analysis/**.cpp", {unity_group="analysis"})
@@ -60,10 +57,6 @@ target("core")
     add_files("./strategy/**.cpp", {unity_group="strategy"})
     add_files("./trade_manage/**.cpp", {unity_group="trade_manage"})
     add_files("./trade_sys/**.cpp", {unity_group="trade_sys"})
-
-    if has_config("arrow") then
-        add_files("./views/**.cpp", {unity_group="views"})
-    end
 
     on_load("windows", "linux", "macosx", function(target)
         import("lib.detect.find_tool")
@@ -101,10 +94,21 @@ target("core")
             pydir_include = os.iorun(py3config .. " --includes"):trim()
             pydir_lib = os.iorun(py3config .. " --libs"):trim()
         else
-            pydir_include = os.iorun("python3-config --includes"):trim()
-            pydir_lib = os.iorun("python3-config --libs"):trim()
+            local stmt
+            if is_plat("macosx") then
+                stmt = [[python -c 'import sys; v = sys.version_info; print(f"{str(v.major)}.{str(v.minor)}")']]
+            else
+                stmt = [[python3 -c 'import sys; v = sys.version_info; print(f"{str(v.major)}.{str(v.minor)}")']]
+            end
+            local python_version = os.iorun(stmt):trim()
+            local py3config = "python" .. python_version .. "-config"
+            -- print("py3config: " .. py3config)
+            pydir_include = os.iorun(py3config .. " --includes"):trim()
+            pydir_lib = os.iorun(py3config .. " --libs"):trim()
         end
         assert(pydir_include, "python3-config not found!")
+        print("pydir_include: " .. pydir_include)
+        -- print("pydir_lib: " .. pydir_lib)
         target:add("cxflags", pydir_include, pydir_lib)    
     end)
 
@@ -112,13 +116,13 @@ target("core")
         local dst_dir = "$(projectdir)/hikyuu/cpp/"
         local dst_obj = dst_dir .. "core.so"
 
-        -- need xmake 445e43b40846b29b9abb1293b32b27b7104f54fa
         if not is_plat("cross") then
           local stmt = [[python -c 'import sys; v = sys.version_info; print(str(v.major)+str(v.minor))']]
           if is_plat("linux") then
             stmt = [[python3 -c 'import sys; v = sys.version_info; print(str(v.major)+str(v.minor))']]
           end
           local python_version = os.iorun(stmt):trim()
+          print("python_version: " .. python_version)
           dst_obj = dst_dir .. "core" ..  python_version
         end
 
@@ -148,17 +152,19 @@ target("core")
             os.run(format("install_name_tool -change libssl.3.dylib @loader_path/libssl.3.dylib %s", dst_obj))
             os.run(format("install_name_tool -change libcrypto.3.dylib @loader_path/libcrypto.3.dylib %s", dst_obj))
 
-            if get_config("kind") == "shared" then
-                dst_obj = dst_dir .. "libhikyuu.dylib"
-                os.run(format("install_name_tool -change libssl.3.dylib @loader_path/libssl.3.dylib %s", dst_obj))
-                os.run(format("install_name_tool -change libcrypto.3.dylib @loader_path/libcrypto.3.dylib %s", dst_obj))
-            else
-                os.cp(target:targetdir() .. '/*.a', dst_dir)
-            end
+            if get_config("mysql") then
+                if get_config("kind") == "shared" then
+                    dst_obj = dst_dir .. "libhikyuu.dylib"
+                    os.run(format("install_name_tool -change libssl.3.dylib @loader_path/libssl.3.dylib %s", dst_obj))
+                    os.run(format("install_name_tool -change libcrypto.3.dylib @loader_path/libcrypto.3.dylib %s", dst_obj))
+                else
+                    os.cp(target:targetdir() .. '/*.a', dst_dir)
+                end
 
-            filename = "libmysqlclient.21.dylib"
-            os.run(format("install_name_tool -change @loader_path/../lib/libssl.3.dylib @loader_path/libssl.3.dylib %s", dst_dir .. filename))
-            os.run(format("install_name_tool -change @loader_path/../lib/libcrypto.3.dylib @loader_path/libcrypto.3.dylib %s", dst_dir .. filename))
+                filename = "libmysqlclient.21.dylib"
+                os.run(format("install_name_tool -change @loader_path/../lib/libssl.3.dylib @loader_path/libssl.3.dylib %s", dst_dir .. filename))
+                os.run(format("install_name_tool -change @loader_path/../lib/libcrypto.3.dylib @loader_path/libcrypto.3.dylib %s", dst_dir .. filename))
+            end
         end
 
         os.cp("$(projectdir)/i18n/zh_CN/*.mo", "$(projectdir)/hikyuu/cpp/i18n/zh_CN/")

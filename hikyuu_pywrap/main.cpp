@@ -45,10 +45,6 @@ void export_global_main(py::module& m);
 void export_analysis_main(py::module& m);
 void export_misc(py::module& m);
 
-#if HKU_ENABLE_ARROW
-void export_views_main(py::module& m);
-#endif
-
 void export_StrategeContext(py::module& m);
 void export_strategy_main(py::module& m);
 
@@ -63,9 +59,14 @@ PYBIND11_MODULE(core310, m) {
 #elif PY_MINOR_VERSION == 11
 PYBIND11_MODULE(core311, m) {
 #elif PY_MINOR_VERSION == 12
+// #warning "current python version: 3.12"
 PYBIND11_MODULE(core312, m) {
 #elif PY_MINOR_VERSION == 13
+// #warning "current python version: 3.13"
 PYBIND11_MODULE(core313, m) {
+#elif PY_MINOR_VERSION == 14
+// #warning "current python version: 3.14"
+PYBIND11_MODULE(core314, m) {
 #else
 PYBIND11_MODULE(core, m) {
 #endif
@@ -115,10 +116,6 @@ PYBIND11_MODULE(core, m) {
 
     export_analysis_main(m);
     export_strategy_main(m);
-
-#if HKU_ENABLE_ARROW
-    export_views_main(m);
-#endif
 
     export_global_main(m);
     export_io_redirect(m);

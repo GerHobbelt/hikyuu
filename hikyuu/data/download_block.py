@@ -123,7 +123,7 @@ def save_block(stkcodes: list,  filename: str):
     # hku_info(f"已保存至 {filename}")
 
 
-@hku_catch(ret={}, trace=False)
+@hku_catch(trace=False)
 def down_em_all_hybk_info():
     """下载东财所有行业板块列表"""
     save_path = f'{_BLOCK_SAVE_PATH}/行业板块'
@@ -135,15 +135,21 @@ def down_em_all_hybk_info():
     for i, blk in enumerate(blk_list):
         filename = f"{save_path}/{blk[0]}_{blk[1]}.txt"
         if is_file_can_download(filename, 5 * 24 * 60 * 60):
-            stk_codes = get_hybk_cons_code(blk[0])
-            hku_info(f"{i+1}|{total} 获取行业板块{blk[1]}成分: {len(stk_codes)}")
+            try:
+                stk_codes = get_hybk_cons_code(blk[0])
+                hku_info(f"{i+1}|{total} 获取行业板块{blk[1]}成分: {len(stk_codes)}")
+            except (ConnectionError, ConnectionAbortedError, ConnectionResetError, ConnectionRefusedError) as e:
+                raise e
+            except Exception as e:
+                hku_warn(f"Failed! {type(e).__name__}: {str(e)}")
+                continue
             stk_codes = [modifiy_code(code) for code in stk_codes]
             stk_codes = [code for code in stk_codes if code is not None]
             save_block(stk_codes, filename)
             time.sleep(random.uniform(1, 3))
 
 
-@hku_catch(ret={}, trace=False)
+@hku_catch(trace=False)
 def down_em_all_gnbk_info():
     """获取所有概念版本列表"""
     save_path = f'{_BLOCK_SAVE_PATH}/概念板块'
@@ -157,7 +163,13 @@ def down_em_all_gnbk_info():
             continue
         filename = f"{save_path}/{sanitize_filename(blk_name)}.txt"
         if is_file_can_download(filename, 30 * 24 * 60 * 60):
-            stk_codes = stock_board_concept_cons_em(blk_name)
+            try:
+                stk_codes = stock_board_concept_cons_em(blk_name)
+            except (ConnectionError, ConnectionAbortedError, ConnectionResetError, ConnectionRefusedError) as e:
+                raise e
+            except Exception as e:
+                hku_warn(f"Failed! {type(e).__name__}: {str(e)}")
+                continue
             stk_codes = stk_codes['代码'].to_list()
             stk_codes = [modifiy_code(code) for code in stk_codes]
             stk_codes = [code for code in stk_codes if code is not None]
@@ -166,7 +178,7 @@ def down_em_all_gnbk_info():
             time.sleep(random.uniform(1, 3))
 
 
-@hku_catch(ret={}, trace=False)
+@hku_catch(trace=False)
 def down_em_all_dybk_info():
     """获取所有地域板块列表"""
     save_path = f'{_BLOCK_SAVE_PATH}/地域板块'
@@ -196,26 +208,32 @@ def down_em_all_dybk_info():
         if not is_file_can_download(filename, 10 * 24 * 60 * 60):
             continue
 
-        params["fs"] = f"b:{blk_code} f:!50"
-        params["pn"] = 1
-        time.sleep(random.uniform(1, 3))
-        r = requests.get(url, params=params, timeout=15)
-        data = r.json()
-        if data["data"] is None:
-            continue
-
-        stk_json = r.json()
-        stk_json = stk_json["data"]["diff"]
-        stk_codes = []
-
-        total_page = math.ceil(data["data"]["total"] / em_num_per_page)
-        for page in range(2, total_page + 1):
-            params["pn"] = page
+        try:
+            params["fs"] = f"b:{blk_code} f:!50"
+            params["pn"] = 1
+            time.sleep(random.uniform(1, 3))
             r = requests.get(url, params=params, timeout=15)
+            data = r.json()
+            if data["data"] is None:
+                continue
+
             stk_json = r.json()
             stk_json = stk_json["data"]["diff"]
-            stk_codes.extend([f"{v['f12']}" for v in stk_json])
-            time.sleep(random.uniform(1, 3))
+            stk_codes = []
+
+            total_page = math.ceil(data["data"]["total"] / em_num_per_page)
+            for page in range(2, total_page + 1):
+                params["pn"] = page
+                r = requests.get(url, params=params, timeout=15)
+                stk_json = r.json()
+                stk_json = stk_json["data"]["diff"]
+                stk_codes.extend([f"{v['f12']}" for v in stk_json])
+                time.sleep(random.uniform(1, 3))
+        except (ConnectionError, ConnectionAbortedError, ConnectionResetError, ConnectionRefusedError):
+            raise e
+        except Exception as e:
+            hku_warn(f"Failed! {type(e).__name__}: {str(e)}")
+            continue
 
         stk_codes = [modifiy_code(code) for code in stk_codes]
         stk_codes = [code for code in stk_codes if code is not None]
@@ -223,7 +241,7 @@ def down_em_all_dybk_info():
         hku_info(f'{i+1}|{total} 获取地域板块{blk_name}成分: {len(stk_codes)}')
 
 
-@hku_catch(ret={}, trace=False)
+@hku_catch(trace=False)
 def download_all_zsbk_info():
     """获取所有指数成分股列表"""
     save_path = f'{_BLOCK_SAVE_PATH}/指数板块'
@@ -258,6 +276,7 @@ def download_all_zsbk_info():
                          "000974", "000996", "000997", "000999", "399415", "399416"])
 
     failed_sina = 0
+    failed_csindex = 0
     blk_set = {}
     blk_codes = blk_info["index_code"]
     blk_names = blk_info["display_name"]
@@ -276,13 +295,17 @@ def download_all_zsbk_info():
 
         try:
             if blk_code[:3] == "399":
-                if failed_sina >= 5:
+                if failed_sina > 10:
                     continue
                 stk_codes = ak.index_stock_cons(symbol=blk_code)
                 stk_codes = stk_codes['品种代码'].to_list()
+                failed_sina = 0
             else:
+                if failed_csindex > 10:
+                    continue
                 stk_codes = ak.index_stock_cons_csindex(symbol=blk_code)
                 stk_codes = stk_codes['成分券代码'].to_list()
+                failed_csindex = 0
 
             stk_codes = [modifiy_code(code) for code in stk_codes]
             stk_codes = [code for code in stk_codes if code is not None]
@@ -291,10 +314,19 @@ def download_all_zsbk_info():
             blk_set[blk_name] = 1
         except KeyboardInterrupt:
             break
+        except (ConnectionError, ConnectionAbortedError, ConnectionResetError, ConnectionRefusedError):
+            if blk_code[:3] == "399":
+                hku_warn("ConnectionError! Sina closed!")
+                failed_sina = 100
+            else:
+                hku_warn("ConnectionError! CSIndex closed!")
+                failed_csindex = 100
         except Exception as e:
-            print(f"Failed! {i}, {blk_code}, {blk_name} {str(e)}")
-            if blk_code.startswith("399"):
+            print(f"Failed! {i}, {blk_code}, {blk_name}! {type(e).__name__}: {str(e)}")
+            if blk_code[:3] == "399":
                 failed_sina += 1
+            else:
+                failed_csindex += 1
             # raise e
         time.sleep(random.uniform(1, 3))
 
@@ -304,7 +336,7 @@ def download_block_info():
     # down_em_all_dybk_info()
     # down_em_all_gnbk_info()
     download_all_zsbk_info()
-    
+
 
 if __name__ == "__main__":
     # down_em_all_hybk_info()
