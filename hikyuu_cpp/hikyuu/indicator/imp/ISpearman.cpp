@@ -83,6 +83,9 @@ void ISpearman::_calculate(const Indicator &ind) {
         return;
     }
 
+    _increment_calculate(ind, m_discard);
+
+#if 0
     auto levela = std::make_unique<value_t[]>(n);
     auto levelb = std::make_unique<value_t[]>(n);
     auto *ptra = levela.get();
@@ -122,6 +125,61 @@ void ISpearman::_calculate(const Indicator &ind) {
         a++;
         b++;
     }
+#endif
+}
+
+bool ISpearman::supportIncrementCalculate() const {
+    return getParam<int>("n") > 0;
+}
+
+size_t ISpearman::min_increment_start() const {
+    return getParam<int>("n");
+}
+
+void ISpearman::_increment_calculate(const Indicator &ind, size_t start_pos) {
+    size_t total = ind.size();
+    Indicator ref = prepare(ind);
+
+    int n = getParam<int>("n");
+    double back = std::pow(n, 3) - n;
+    auto *dst = this->data();
+    auto const *srca = ind.data() + 1 - n;
+    auto const *srcb = ref.data() + 1 - n;
+    global_parallel_for_index_void(
+      start_pos, total,
+      [=](size_t i) {
+          const auto *a = srca + i;
+          const auto *b = srcb + i;
+          vector<IndicatorImp::value_t> tmpa;
+          vector<IndicatorImp::value_t> tmpb;
+          tmpa.reserve(n);
+          tmpa.reserve(n);
+          for (int j = 0; j < n; j++) {
+              if (!std::isnan(a[j]) && !std::isnan(b[j])) {
+                  tmpa.push_back(a[j]);
+                  tmpb.push_back(b[j]);
+              }
+          }
+          int act_count = tmpa.size();
+          if (act_count < 2) {
+              return;
+          }
+
+          auto levela = std::vector<value_t>(n);
+          auto levelb = std::vector<value_t>(n);
+          auto *ptra = levela.data();
+          auto *ptrb = levelb.data();
+
+          spearmanLevel(tmpa.data(), ptra, act_count);
+          spearmanLevel(tmpb.data(), ptrb, act_count);
+          value_t sum = 0.0;
+          for (int j = 0; j < act_count; j++) {
+              sum += std::pow(ptra[j] - ptrb[j], 2);
+          }
+          dst[i] = act_count == n ? 1.0 - 6.0 * sum / back
+                                  : 1.0 - 6.0 * sum / (std::pow(act_count, 3) - act_count);
+      },
+      100);
 }
 
 Indicator HKU_API SPEARMAN(const Indicator &ref_ind, int n, bool fill_null) {

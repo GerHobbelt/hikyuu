@@ -38,6 +38,10 @@ IndicatorImpPtr IContext::_clone() {
     return p;
 }
 
+void IContext::_clearIntermediateResults() {
+    m_ref_ind.clearIntermediateResults();
+}
+
 string IContext::str() const {
     std::ostringstream os;
     os << "Indicator{\n"
@@ -76,13 +80,13 @@ void IContext::_calculate(const Indicator& ind) {
     HKU_IF_RETURN((self_k == in_k || in_k == null_k) && this->size() != 0, void());
 
     auto self_dates = m_ref_ind.getDatetimeList();
-    HKU_WARN_IF((self_k == null_k && m_ref_ind.empty() && self_dates.empty()),
-                "The data length of context is zero! ");
+    // HKU_WARN_IF((self_k == null_k && m_ref_ind.empty() && self_dates.empty()),
+    //             "The data length of context is zero! ");
 
     auto ref = m_ref_ind;
 
     if (in_k != null_k && in_k != self_k) {
-        if (self_dates.empty()) {
+        if (self_dates.empty() && self_k.getStock().isNull()) {
             // 上下文无效且无对齐日期，按时间无关序列计算并对齐
             if (ref.size() > in_k.size()) {
                 ref = SLICE(ref, ref.size() - in_k.size(), ref.size());
@@ -109,10 +113,14 @@ void IContext::_calculate(const Indicator& ind) {
                 } else {
                     query = KQueryByIndex(in_query.start(), in_query.end(), ktype, recover_type);
                 }
-                ref = m_ref_ind(self_stk.getKData(query));
+                // ref = m_ref_ind(self_stk.getKData(query));
+                // 让其参考指标使用增量计算
+                ref.setContext(self_stk.getKData(query));
 
             } else {
-                ref = m_ref_ind(self_stk.getKData(in_k.getQuery()));
+                // ref = m_ref_ind(self_stk.getKData(in_k.getQuery()));
+                // 让其参考指标使用增量计算
+                ref.setContext(self_stk.getKData(in_k.getQuery()));
             }
             ref = ALIGN(ref, in_k, getParam<bool>("fill_null"));
         } else if (self_dates.size() > 1) {
@@ -153,6 +161,19 @@ Indicator HKU_API CONTEXT(const Indicator& ind, bool fill_null, bool use_self_kt
     p->setParam<bool>("fill_null", fill_null);
     p->setParam<bool>("use_self_ktype", use_self_ktype);
     p->setParam<bool>("use_self_recover_type", use_self_recover_type);
+    return p->calculate();
+}
+
+Indicator HKU_API CONTEXT(const Indicator& ind, const Stock& stk, bool fill_null) {
+    HKU_WARN_IF(ind.getContext() != Null<KData>(),
+                "The context of input indicator will be ignored!");
+    KData kdata = stk.isNull() ? Null<KData>() : stk.getKData(KQuery(0, 0));
+    Indicator ref = ind.clone();
+    ref.setContext(kdata);
+    auto p = make_shared<IContext>(ref);
+    p->setParam<bool>("fill_null", fill_null);
+    p->setParam<bool>("use_self_ktype", false);
+    p->setParam<bool>("use_self_recover_type", false);
     return p->calculate();
 }
 

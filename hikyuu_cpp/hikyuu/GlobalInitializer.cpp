@@ -77,11 +77,13 @@ void GlobalInitializer::init() {
     TA_Initialize();
 #endif
 
-    size_t cpu_num = std::thread::hardware_concurrency() * 3 / 2;
-    if (cpu_num > 128) {
-        cpu_num = 128;
-    } else if (cpu_num > 64) {
-        cpu_num = cpu_num * 10 / 8;
+    size_t cpu_num = std::thread::hardware_concurrency();
+    if (cpu_num <= 10) {
+        cpu_num = cpu_num * 2;
+    } else if (cpu_num <= 64) {
+        cpu_num = cpu_num * 3 / 2;
+    } else {
+        cpu_num = cpu_num * 5 / 4;
     }
     init_global_task_group(cpu_num);
 
@@ -107,11 +109,6 @@ void GlobalInitializer::clean() {
 
     StockManager &sm = StockManager::instance();
     sm.cancelLoad();
-    int count = 0;
-    while (count < 3 && !sm.dataReady()) {
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-        count++;
-    }
 
 #if HKU_OS_OSX
     // 主动停止异步数据加载任务组，否则 hdf5 在 linux 下会报关闭异常
@@ -141,6 +138,7 @@ void GlobalInitializer::clean() {
 #endif
 
     DataDriverFactory::release();
+    sm.clearPlugin();
 
 #if HKU_ENABLE_TA_LIB
     TA_Shutdown();

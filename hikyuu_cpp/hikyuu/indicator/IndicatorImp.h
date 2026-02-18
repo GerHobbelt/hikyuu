@@ -30,7 +30,7 @@ class HKU_API IndicatorImp : public enable_shared_from_this<IndicatorImp> {
     friend HKU_API std::ostream& operator<<(std::ostream& os, const IndicatorImp& imp);
 
 public:
-    enum OPType {
+    enum OPType : uint8_t {
         LEAF,   ///< 叶子节点
         OP,     /// OP(OP1,OP2) OP1->calcalue(OP2->calculate(ind))
         ADD,    ///< 加
@@ -68,14 +68,14 @@ public:
     typedef shared_ptr<IndicatorImp> IndicatorImpPtr;
     IndicatorImpPtr operator()(const Indicator& ind);
 
-    size_t getResultNumber() const;
-    OPType getOPType() const;
+    size_t getResultNumber() const noexcept;
+    OPType getOPType() const noexcept;
 
-    size_t discard() const;
+    size_t discard() const noexcept;
 
-    void setDiscard(size_t discard);
+    void setDiscard(size_t discard) noexcept;
 
-    size_t size() const;
+    size_t size() const noexcept;
 
     value_t get(size_t pos, size_t num = 0) const;
 
@@ -113,8 +113,8 @@ public:
     /** 数据中是否包含 nan 值 */
     bool existNan(size_t result_idx = 0) const;
 
-    const string& name() const;
-    void name(const string& name);
+    const string& name() const noexcept;
+    void name(const string& name) noexcept;
 
     /** 返回形如：Name(param1=val,param2=val,...) */
     string long_name() const;
@@ -122,7 +122,7 @@ public:
     virtual string formula() const;
     virtual string str() const;
 
-    bool isLeaf() const;
+    bool isLeaf() const noexcept;
 
     Indicator calculate();
 
@@ -138,7 +138,7 @@ public:
 
     IndicatorImpPtr clone();
 
-    bool isPythonObject() const;
+    bool isPythonObject() const noexcept;
 
     /** 仅用于两个结果集数量相同、长度相同的指标交换数据，不交换其他参数。失败抛出异常 */
     void swap(IndicatorImp* other);
@@ -158,9 +158,17 @@ public:
     // ===================
     virtual void _calculate(const Indicator&);
 
+    // ====== start 动态周期计算相关接口 ======
     /** 动态周期计算，子类可重载该函数，默认不支持动态周期计算 */
     virtual void _dyn_run_one_step(const Indicator& ind, size_t curPos, size_t step) {}
 
+    /** 是否必须串行计算 */
+    bool isSerial() const noexcept {
+        return m_is_serial;
+    }
+    // ====== end 动态周期计算相关接口 ======
+
+    // ====== start 增量计算相关接口 =======
     /** 是否支持增量计算 */
     virtual bool supportIncrementCalculate() const;
 
@@ -169,18 +177,14 @@ public:
     }
 
     virtual void _increment_calculate(const Indicator& ind, size_t start_pos) {}
-
-    /** 是否必须串行计算 */
-    bool isSerial() const {
-        return m_is_serial;
-    }
+    // ====== end 增量计算相关接口 =======
 
     virtual IndicatorImpPtr _clone() {
         return make_shared<IndicatorImp>();
     }
 
-    virtual bool isNeedContext() const {
-        return false;
+    bool isNeedContext() const noexcept {
+        return m_need_context;
     }
 
     virtual void _dyn_calculate(const Indicator&);
@@ -199,20 +203,24 @@ public:
     //  内部特殊用途公共接口
     // ===================
 
+    /** 强制清空所有子节点缓存结果(含支持增量计算节点)，会导致子节点增量计算失效 */
+    void clearIntermediateResults();
+    virtual void _clearIntermediateResults() {}
+
     /** 判断是否和另一个指标等效，即计算效果相同 */
     bool alike(const IndicatorImp& other) const;
 
     /** 判断指标公式中是否包含指定名称的指标（特殊用途） */
     bool contains(const string& name) const;
 
-    value_t* data(size_t result_idx = 0);
-    value_t const* data(size_t result_idx = 0) const;
+    value_t* data(size_t result_idx = 0) noexcept;
+    value_t const* data(size_t result_idx = 0) const noexcept;
 
     void getAllSubNodes(vector<IndicatorImpPtr>& nodes) const;
 
-    IndicatorImpPtr getRightNode() const;
-    IndicatorImpPtr getLeftNode() const;
-    IndicatorImpPtr getThreeNode() const;
+    IndicatorImpPtr getRightNode() const noexcept;
+    IndicatorImpPtr getLeftNode() const noexcept;
+    IndicatorImpPtr getThreeNode() const noexcept;
     void printTree(bool show_long_name = false) const;
     void printAllSubTrees(bool show_long_name = false) const;
     void printLeaves(bool show_long_name = false) const;
@@ -290,6 +298,7 @@ protected:
     KData m_old_context;
     vector<value_t>* m_pBuffer[MAX_RESULT_NUM];
 
+    bool m_need_context{false};
     bool m_is_python_object{false};
     bool m_need_self_alike_compare{false};
     bool m_is_serial{false};
@@ -322,6 +331,7 @@ private:
         ar& BOOST_SERIALIZATION_NVP(m_result_num);
         ar& BOOST_SERIALIZATION_NVP(m_context);
         ar& BOOST_SERIALIZATION_NVP(m_old_context);
+        ar& BOOST_SERIALIZATION_NVP(m_need_context);
         ar& BOOST_SERIALIZATION_NVP(m_is_python_object);
         ar& BOOST_SERIALIZATION_NVP(m_need_self_alike_compare);
         ar& BOOST_SERIALIZATION_NVP(m_is_serial);
@@ -368,6 +378,7 @@ private:
         ar& BOOST_SERIALIZATION_NVP(m_result_num);
         ar& BOOST_SERIALIZATION_NVP(m_context);
         ar& BOOST_SERIALIZATION_NVP(m_old_context);
+        ar& BOOST_SERIALIZATION_NVP(m_need_context);
         ar& BOOST_SERIALIZATION_NVP(m_is_python_object);
         ar& BOOST_SERIALIZATION_NVP(m_need_self_alike_compare);
         ar& BOOST_SERIALIZATION_NVP(m_is_serial);
@@ -437,12 +448,6 @@ public:                                                                         
         return true;                                                                    \
     }
 
-#define INDICATOR_NEED_CONTEXT                    \
-public:                                           \
-    virtual bool isNeedContext() const override { \
-        return true;                              \
-    }
-
 /** 获取 OPType 名称字符串 */
 string HKU_API getOPTypeName(IndicatorImp::OPType);
 
@@ -451,31 +456,31 @@ typedef shared_ptr<IndicatorImp> IndicatorImpPtr;
 HKU_API std::ostream& operator<<(std::ostream&, const IndicatorImp&);
 HKU_API std::ostream& operator<<(std::ostream&, const IndicatorImpPtr&);
 
-inline IndicatorImp::OPType IndicatorImp::getOPType() const {
+inline IndicatorImp::OPType IndicatorImp::getOPType() const noexcept {
     return m_optype;
 }
 
-inline size_t IndicatorImp::getResultNumber() const {
+inline size_t IndicatorImp::getResultNumber() const noexcept {
     return m_result_num;
 }
 
-inline size_t IndicatorImp::discard() const {
+inline size_t IndicatorImp::discard() const noexcept {
     return m_discard;
 }
 
-inline size_t IndicatorImp::size() const {
+inline size_t IndicatorImp::size() const noexcept {
     return m_pBuffer[0] ? m_pBuffer[0]->size() : 0;
 }
 
-inline const string& IndicatorImp::name() const {
+inline const string& IndicatorImp::name() const noexcept {
     return m_name;
 }
 
-inline void IndicatorImp::name(const string& name) {
+inline void IndicatorImp::name(const string& name) noexcept {
     m_name = name;
 }
 
-inline bool IndicatorImp::isLeaf() const {
+inline bool IndicatorImp::isLeaf() const noexcept {
     return m_optype == LEAF ? true : false;
 }
 
@@ -502,11 +507,11 @@ inline bool IndicatorImp::haveIndParam(const string& name) const {
     return m_ind_params.find(name) != m_ind_params.end();
 }
 
-inline IndicatorImp::value_t* IndicatorImp::data(size_t result_idx) {
+inline IndicatorImp::value_t* IndicatorImp::data(size_t result_idx) noexcept {
     return m_pBuffer[result_idx] ? m_pBuffer[result_idx]->data() : nullptr;
 }
 
-inline IndicatorImp::value_t const* IndicatorImp::data(size_t result_idx) const {
+inline IndicatorImp::value_t const* IndicatorImp::data(size_t result_idx) const noexcept {
     return m_pBuffer[result_idx] ? m_pBuffer[result_idx]->data() : nullptr;
 }
 
@@ -514,19 +519,19 @@ inline size_t IndicatorImp::_get_step_start(size_t pos, size_t step, size_t disc
     return step == 0 || pos < discard + step ? discard : pos + 1 - step;
 }
 
-inline bool IndicatorImp::isPythonObject() const {
+inline bool IndicatorImp::isPythonObject() const noexcept {
     return m_is_python_object;
 }
 
-inline IndicatorImpPtr IndicatorImp::getRightNode() const {
+inline IndicatorImpPtr IndicatorImp::getRightNode() const noexcept {
     return m_right;
 }
 
-inline IndicatorImpPtr IndicatorImp::getLeftNode() const {
+inline IndicatorImpPtr IndicatorImp::getLeftNode() const noexcept {
     return m_left;
 }
 
-inline IndicatorImpPtr IndicatorImp::getThreeNode() const {
+inline IndicatorImpPtr IndicatorImp::getThreeNode() const noexcept {
     return m_three;
 }
 

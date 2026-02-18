@@ -37,6 +37,8 @@ void HKU_API registerExtraKType(const string& ktype, const string& basetype, int
  */
 void HKU_API releaseExtraKType();
 
+void HKU_API enableKDataCache(bool enable);
+
 //-------------------------------
 // 以下函数为内部使用，无需引出
 //-------------------------------
