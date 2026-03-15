@@ -15,6 +15,7 @@
 #include "ThreadSafeQueue.h"
 #include "WorkStealQueue.h"
 #include "InterruptFlag.h"
+#include "../Log.h"
 #include "../cppdef.h"
 
 #ifdef __GNUC__
@@ -157,14 +158,14 @@ public:
 
     /** 向线程池提交任务 */
     template <typename FunctionType>
-    auto submit(FunctionType f) {
+    auto submit(FunctionType&& f) {
         if (m_thread_need_stop.isSet() || m_done.load(std::memory_order_acquire)) {
             throw std::logic_error(
               "You can't submit a task to the stopped GlobalStealThreadPool!!");
         }
 
         typedef typename std::invoke_result<FunctionType>::type result_type;
-        std::packaged_task<result_type()> task(f);
+        std::packaged_task<result_type()> task(std::forward<FunctionType>(f));
         task_handle<result_type> res(task.get_future());
 
         std::thread::id id = std::this_thread::get_id();
@@ -279,6 +280,19 @@ public:
             m_queues[i]->clear();
         }
         m_threads.clear();
+    }
+
+    struct ExecutorWrapper {
+        GlobalStealThreadPool* pool;
+        template <typename Function>
+        void execute(Function f) {
+            pool->submit(std::move(f));
+        }
+    };
+
+    /** 协程执行器 */
+    ExecutorWrapper executor() {
+        return ExecutorWrapper{this};
     }
 
 public:

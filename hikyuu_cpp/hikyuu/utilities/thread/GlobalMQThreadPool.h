@@ -103,13 +103,13 @@ public:
 
     /** 向线程池提交任务 */
     template <typename FunctionType>
-    auto submit(FunctionType f) {
+    auto submit(FunctionType&& f) {
         if (m_thread_need_stop.isSet() || m_done) {
             throw std::logic_error("You can't submit a task to the stopped GlobalMQThreadPool!");
         }
 
         typedef typename std::invoke_result<FunctionType>::type result_type;
-        std::packaged_task<result_type()> task(f);
+        std::packaged_task<result_type()> task(std::forward<FunctionType>(f));
         task_handle<result_type> res(task.get_future());
 
         // 向空队列或任务数最小的队列中加入任务
@@ -221,6 +221,19 @@ public:
         }
 
         m_done = true;
+    }
+
+    struct ExecutorWrapper {
+        GlobalMQThreadPool* pool;
+        template <typename Function>
+        void execute(Function f) {
+            pool->submit(std::move(f));
+        }
+    };
+
+    /** 协程执行器 */
+    ExecutorWrapper executor() {
+        return ExecutorWrapper{this};
     }
 
 private:
