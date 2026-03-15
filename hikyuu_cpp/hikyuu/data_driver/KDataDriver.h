@@ -9,10 +9,11 @@
 #ifndef KDATADRIVER_H_
 #define KDATADRIVER_H_
 
-#include "../utilities/Parameter.h"
-#include "../KQuery.h"
-#include "../TimeLineRecord.h"
-#include "../TransRecord.h"
+#include "hikyuu/utilities/Parameter.h"
+#include "hikyuu/KQuery.h"
+#include "hikyuu/TimeLineRecord.h"
+#include "hikyuu/TransRecord.h"
+#include "hikyuu/factor/FactorMeta.h"
 
 namespace hku {
 
@@ -119,6 +120,10 @@ public:
      */
     virtual TransList getTransList(const string& market, const string& code, const KQuery& query);
 
+    virtual void saveFactorMeta(const FactorMeta& factor);
+
+    virtual void saveIndicatorAsFactor(const string& name, const Indicator& ind);
+
     //---------------------------------------------------
     // 以下为列式数据库接口
     //---------------------------------------------------
@@ -201,6 +206,10 @@ public:
 
     TransList getTransList(const string& market, const string& code, const KQuery& query) {
         return m_driver->getTransList(market, code, query);
+    }
+
+    void saveIndicatorAsFactor(const string& name, const Indicator& ind) {
+        m_driver->saveIndicatorAsFactor(name, ind);
     }
 
     bool isColumnFirst() const {
