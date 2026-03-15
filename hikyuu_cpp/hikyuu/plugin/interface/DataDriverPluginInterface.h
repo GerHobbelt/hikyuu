@@ -24,17 +24,24 @@ public:
     virtual BlockInfoDriverPtr getBlockInfoDriver() = 0;
     virtual BaseInfoDriverPtr getBaseInfoDriver() = 0;
 
-    virtual FactorImpPtr createFactorImp(const string& name, const Indicator& formula,
-                                         const KQuery::KType& ktype, const string& brief,
-                                         const string& details, bool need_persist,
-                                         const Datetime& start_date, const Block& block) = 0;
     virtual FactorList getAllFactors() = 0;
     virtual FactorSetList getAllFactorSets() = 0;
     virtual void updateAllFactorsValues(const KQuery::KType& ktype) = 0;
 
+    virtual Factor getFactor(const string& name, const KQuery::KType& ktype) = 0;
+    virtual void saveFactor(const Factor& factor) = 0;
+    virtual void removeFactor(const string& name, const KQuery::KType& ktype) = 0;
+
     virtual FactorSet getFactorSet(const string& name, const KQuery::KType& ktype) = 0;
     virtual void saveFactorSet(const FactorSet& set) = 0;
     virtual void removeFactorSet(const string& name, const KQuery::KType& ktype) = 0;
+
+    virtual IndicatorList getValues(const Factor& factor, const StockList& stocks,
+                                    const KQuery& query, bool align, bool fill_null, bool tovalue,
+                                    const DatetimeList& align_dates) = 0;
+    virtual vector<IndicatorList> getValues(const FactorSet& factor_set, const StockList& stocks,
+                                            const KQuery& query, bool align, bool fill_null,
+                                            bool tovalue, const DatetimeList& align_dates) = 0;
 };
 
 }  // namespace hku

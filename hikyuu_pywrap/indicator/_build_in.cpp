@@ -32,6 +32,12 @@ Indicator (*AMO3)() = AMO;
 Indicator (*VOL1)(const KData&) = VOL;
 Indicator (*VOL3)() = VOL;
 
+Indicator (*ISLIMITUP1)() = ISLIMITUP;
+Indicator (*ISLIMITUP2)(const KData&) = ISLIMITUP;
+
+Indicator (*ISLIMITDOWN1)() = ISLIMITDOWN;
+Indicator (*ISLIMITDOWN2)(const KData&) = ISLIMITDOWN;
+
 Indicator (*KDATA_PART1)(const KData& kdata, const string& part) = KDATA_PART;
 Indicator (*KDATA_PART3)(const string& part) = KDATA_PART;
 
@@ -470,12 +476,6 @@ Indicator (*SLOPE2)(const IndParam&) = SLOPE;
 Indicator (*SLOPE3)(const Indicator&, int) = SLOPE;
 Indicator (*SLOPE4)(const Indicator&, const IndParam&) = SLOPE;
 Indicator (*SLOPE5)(const Indicator&, const Indicator&) = SLOPE;
-
-Indicator (*MDD_1)() = MDD;
-Indicator (*MDD_2)(const Indicator&) = MDD;
-
-Indicator (*MRR_1)() = MRR;
-Indicator (*MRR_2)(const Indicator&) = MRR;
 
 Indicator (*ZHBOND10_1)(double) = ZHBOND10;
 Indicator (*ZHBOND10_2)(const DatetimeList&, double) = ZHBOND10;
@@ -1821,15 +1821,25 @@ void export_Indicator_build_in(py::module& m) {
     :param int|Indicator|IndParam n: 时间窗口
     :rtype: Indicator)");
 
-    m.def("MDD", MDD_1);
-    m.def("MDD", MDD_2, R"(MDD([data])
+    m.def("MDD", py::overload_cast<int>(&MDD), py::arg("n") = 0);
+    m.def("MDD", py::overload_cast<const Indicator&, int>(&MDD), py::arg("data"), py::arg("n") = 0,
+          R"(MDD([data, n=0])
     
-    当前价格相对历史最高值的回撤百分比，通常用于计算最大回撤)");
+    最大回撤百分比(n=0 则无时间窗口限制), 按行业惯例为正值
+    
+    :param Indicator data: 输入数据
+    :param int n: 时间窗口
+    :rtype: Indicator)");
 
-    m.def("MRR", MRR_1);
-    m.def("MRR", MRR_2, R"(MRR([data])
+    m.def("MRR", py::overload_cast<int>(&MRR), py::arg("n") = 0);
+    m.def("MRR", py::overload_cast<const Indicator&, int>(&MRR), py::arg("data"), py::arg("n"),
+          R"(MRR([data])
     
-    当前价格相对历史最低值的盈利百分比，可用于计算历史最高盈利比例)");
+    最大盈利百分比(和MDD向对应的相反方向计算)
+
+    :param Indicator data: 输入数据
+    :param int n: 时间窗口
+    :rtype: Indicator)");
 
     m.def("ZHBOND10", ZHBOND10_1, py::arg("default_val") = 0.4);
     m.def("ZHBOND10", ZHBOND10_2, py::arg("data"), py::arg("default_val") = 0.4);
@@ -2271,4 +2281,48 @@ void export_Indicator_build_in(py::module& m) {
 
     :param Indicator ind: 指标
     :param int n: 周期数)");
+
+    // ISLIMITUP 涨停判断指标绑定
+    m.def("ISLIMITUP", ISLIMITUP1, R"(ISLIMITUP()
+
+    判断股票是否涨停指标
+
+    根据不同股票类型判断当日收盘价是否达到涨停板价格：
+    - A股普通股票：涨停幅度为10%
+    - 北交所股票：涨停幅度为30%
+    - 创业板/科创板股票：涨停幅度为20%
+    - ST股票涨停幅度为5%，但由于缺乏ST标识的历史日期信息，暂未处理
+
+    涨停判断逻辑：当日收盘价 >= 前一日收盘价 × (1 + 涨停幅度)
+
+    :rtype: Indicator)");
+
+    m.def("ISLIMITUP", ISLIMITUP2, py::arg("kdata"), R"(ISLIMITUP(kdata)
+
+    判断指定K线数据中的股票是否涨停
+
+    :param KData kdata: K线数据
+    :rtype: Indicator)");
+
+    // ISLIMITDOWN 跌停判断指标绑定
+    m.def("ISLIMITDOWN", ISLIMITDOWN1, R"(ISLIMITDOWN()
+
+    判断股票是否跌停指标
+
+    根据不同股票类型判断当日收盘价是否达到跌停板价格：
+    - A股普通股票：跌停幅度为10%
+    - 北交所股票：跌停幅度为30%
+    - 创业板/科创板股票：跌停幅度为20%
+    - ST股票跌停幅度为5%，但由于缺乏ST标识的历史日期信息，暂未处理
+
+    跌停判断逻辑：当日收盘价 <= 前一日收盘价 × (1 - 跌停幅度)
+
+    :rtype: Indicator)");
+
+    m.def("ISLIMITDOWN", ISLIMITDOWN2, py::arg("kdata"), R"(ISLIMITDOWN(kdata)
+
+    判断指定K线数据中的股票是否跌停
+
+    :param KData kdata: K线数据
+    :rtype: Indicator)");
 }

@@ -822,6 +822,40 @@
     :param bool ignore_discard: 忽略指标丢弃数据
 
 
+.. py:function:: ISLIMITDOWN([kdata])
+
+    判断股票是否跌停指标
+
+    根据不同股票类型判断当日收盘价是否达到跌停板价格：
+    
+    - A股普通股票：跌停幅度为10%
+    - 北交所股票：跌停幅度为30%  
+    - 创业板/科创板股票：跌停幅度为20%
+    - ST股票跌停幅度为5%，但由于缺乏ST标识的历史日期信息，暂未处理
+
+    跌停判断逻辑：当日收盘价 <= 前一日收盘价 × (1 - 跌停幅度)
+
+    :param KData kdata: K线数据
+    :rtype: Indicator
+
+
+.. py:function:: ISLIMITUP([kdata])
+
+    判断股票是否涨停指标
+
+    根据不同股票类型判断当日收盘价是否达到涨停板价格：
+    
+    - A股普通股票：涨停幅度为10%
+    - 北交所股票：涨停幅度为30%
+    - 创业板/科创板股票：涨停幅度为20%
+    - ST股票涨停幅度为5%，但由于缺乏ST标识的历史日期信息，暂未处理
+
+    涨停判断逻辑：当日收盘价 >= 前一日收盘价 × (1 + 涨停幅度)
+
+    :param KData kdata: K线数据
+    :rtype: Indicator
+
+
 .. py:function:: ISINF(ind)
 
     判断指标是否为正无穷大 (+inf) 值，若为 +inf 值, 则返回1, 否则返回0。如判断负无穷大, 使用 ISINFA。
@@ -1015,9 +1049,9 @@
     :rtype: Indicator
 
 
-.. py:function:: MDD([ind])
+.. py:function:: MDD([ind, n=0])
 
-    当前价格相对历史最高值的回撤百分比，通常用于计算最大回撤
+    最大回撤百分比(n=0 则无时间窗口限制), 按行业惯例为正值
 
 
 .. py:function:: MIN(ind1, ind2)
@@ -1058,9 +1092,9 @@
     :rtype: Indicator
 
 
-.. py:function:: MRR([ind])
+.. py:function:: MRR([ind, n=0])
 
-    当前价格相对历史最低值的盈利百分比
+    最大盈利百分比(和MDD向对应的相反方向计算)
 
 
 .. py:function:: NDAY(x, y[, n=3])

@@ -17,6 +17,15 @@ public:
     FactorSet();
     explicit FactorSet(const string& name, const KQuery::KType& ktype = KQuery::DAY,
                        const Block& block = Block());
+
+    /**
+     * 构造函数，使用指定的指标列表创建因子集合，因子名称默认为指标名称, 主要用于创建临时的因子集合
+     * @note 同名的指标会被覆盖，最终保留最后一个同名指标
+     * @param inds 指标列表
+     * @param ktype 因子集合的 K 线类型，默认为日线
+     */
+    explicit FactorSet(const IndicatorList& inds, const KQuery::KType& ktype = KQuery::DAY);
+
     FactorSet(const FactorSet& other);
     FactorSet(FactorSet&& other);
     virtual ~FactorSet() = default;
@@ -28,59 +37,54 @@ public:
      * 获取指定证券列表的指定查询参数的计算结果
      * @param stocks 证券列表
      * @param query 查询参数
-     * @param check 是否检查股票列表属于自身指定的 block
+     * @param align 是否对齐日期（按指定align_dates或默认交易日历)，默认 false
+     * @param fill_null 是否填充空值，默认 false
+     * @param tovalue 是否转换为数值，默认 false
+     * @param check 是否检查股票列表属于自身指定的 block，默认 false
+     * @param align_dates 对齐日期列表，默认为空
      * @return stocks * inds 的列表, 按证券顺序
      */
     vector<IndicatorList> getValues(const StockList& stocks, const KQuery& query,
-                                    bool check = false) const;
+                                    bool align = false, bool fill_null = false,
+                                    bool tovalue = false, bool check = false,
+                                    const DatetimeList& align_dates = {}) const;
 
     /**
      * 获取所有因子的指定查询参数的计算结果
      * @param query 查询参数
+     * @param align 是否对齐日期（按指定align_dates或默认交易日历)，默认 false
+     * @param fill_null 是否填充空值，默认 false
+     * @param tovalue 是否转换为数值，默认 false
+     * @param align_dates 对齐日期列表，默认为空
      * @return 所有因子的计算结果
      */
-    vector<IndicatorList> getAllValues(const KQuery& query) const;
+    vector<IndicatorList> getAllValues(const KQuery& query, bool align = false,
+                                       bool fill_null = false, bool tovalue = false,
+                                       const DatetimeList& align_dates = {}) const;
 
-    //------------------------
-    // 基本属性
-    //------------------------
+    const string& name() const noexcept;
 
-    const string& name() const noexcept {
-        return m_data->name;
-    }
+    void name(const string& name);
 
-    const string& ktype() const noexcept {
-        return m_data->ktype;
-    }
+    const string& ktype() const noexcept;
 
-    const Block& block() const noexcept {
-        return m_data->block;
-    }
+    void ktype(const string& ktype);
 
-    void block(const Block& blk) {
-        m_data->block = blk;
-    }
+    const Block& block() const noexcept;
+
+    void block(const Block& blk);
 
     //------------------------
     // 容器操作接口
     //------------------------
 
-    size_t size() const noexcept {
-        return m_data->m_factors.size();
-    }
+    size_t size() const noexcept;
 
-    bool empty() const noexcept {
-        return m_data->m_factors.empty();
-    }
+    bool empty() const noexcept;
 
-    void clear() noexcept {
-        m_data->m_factors.clear();
-        m_data->m_nameIndexMap.clear();
-    }
+    void clear() noexcept;
 
-    bool isNull() const noexcept {
-        return m_data == ms_null_factorset;
-    }
+    bool isNull() const noexcept;
 
     string str() const;
 
@@ -89,26 +93,32 @@ public:
     //------------------------
 
     void add(const Factor& factor);
-    void add(Factor&& factor);
+    void add(const FactorList& factors);
+
+    /** 便捷方法：添加一个指标，并以指定的名称作为因子名称 */
+    void add(const string& name, const Indicator& ind);
+
+    /** 便捷方法：添加一个指标, 以指标名作为因子名称。容易出现存在同名的指标抛出异常 */
+    void add(const Indicator& ind);
+
+    void add(const IndicatorList& inds);
+    void add(const std::map<string, Indicator>& inds);
+
     void remove(const string& name);
     bool have(const string& name) const noexcept;
 
     const Factor& get(const string& name) const;
-    const Factor& get(size_t i) const {
-        return m_data->m_factors[i];
-    }
+    const Factor& get(size_t i) const;
 
-    const Factor& operator[](const string& name) const {
-        return get(name);
-    }
+    const Factor& operator[](const string& name) const;
 
-    const Factor& operator[](size_t i) const {
-        return m_data->m_factors[i];
-    }
+    const Factor& operator[](size_t i) const;
 
-    const FactorList& getAllFactors() const {
-        return m_data->m_factors;
-    }
+    const FactorList& getAllFactors() const;
+
+    void save_to_db() const;
+    void remove_from_db() const;
+    void load_from_db();
 
     //------------------------
     // 迭代器支持
@@ -123,7 +133,8 @@ public:
         using pointer = const Factor*;
         using reference = const Factor&;
 
-        const_iterator(const typename vector<Factor>::const_iterator& iter) : m_iter(iter) {}
+        explicit const_iterator(const typename vector<Factor>::const_iterator& iter)
+        : m_iter(iter) {}
 
         reference operator*() const {
             return *m_iter;
@@ -138,11 +149,11 @@ public:
             return *this;
         }
 
-        const_iterator operator++(int) {
-            const_iterator temp = *this;
-            ++m_iter;
-            return temp;
-        }
+        // const_iterator operator++(int) {
+        //     const_iterator temp = *this;
+        //     ++m_iter;
+        //     return temp;
+        // }
 
         bool operator==(const const_iterator& other) const {
             return m_iter == other.m_iter;
@@ -158,35 +169,142 @@ public:
 
     using iterator = const_iterator;
 
-    const_iterator begin() const {
-        return const_iterator(m_data->m_factors.begin());
-    }
+    const_iterator begin() const;
 
-    const_iterator end() const {
-        return const_iterator(m_data->m_factors.end());
-    }
+    const_iterator end() const;
 
-    const_iterator cbegin() const {
-        return const_iterator(m_data->m_factors.cbegin());
-    }
+    const_iterator cbegin() const;
 
-    const_iterator cend() const {
-        return const_iterator(m_data->m_factors.cend());
-    }
+    const_iterator cend() const;
 
 private:
     struct HKU_API Data {
         string name;
         string ktype;
         Block block;
-        vector<Factor> m_factors;                      // 保持插入顺序
-        unordered_map<string, size_t> m_nameIndexMap;  // 名称到索引的映射，用于快速查找
+        vector<Factor> factors;                      // 保持插入顺序
+        unordered_map<string, size_t> nameIndexMap;  // 名称到索引的映射，用于快速查找
     };
     shared_ptr<Data> m_data;
 
+#if HKU_SUPPORT_SERIALIZATION
 private:
-    static shared_ptr<Data> ms_null_factorset;
+    friend class boost::serialization::access;
+    template <class Archive>
+    void save(Archive& ar, const unsigned int version) const {
+        string name = this->name();
+        ar& BOOST_SERIALIZATION_NVP(name);
+        string ktype = this->ktype();
+        ar& BOOST_SERIALIZATION_NVP(ktype);
+        Block block = this->block();
+        ar& BOOST_SERIALIZATION_NVP(block);
+        FactorList factors = this->getAllFactors();
+        ar& BOOST_SERIALIZATION_NVP(factors);
+    }
+
+    template <class Archive>
+    void load(Archive& ar, const unsigned int version) {
+        string name;
+        string ktype;
+        Block block;
+        ar& BOOST_SERIALIZATION_NVP(name);
+        ar& BOOST_SERIALIZATION_NVP(ktype);
+        ar& BOOST_SERIALIZATION_NVP(block);
+        FactorList factors;
+        ar& BOOST_SERIALIZATION_NVP(factors);
+        this->m_data = make_shared<Data>();
+        this->m_data->name = name;
+        this->m_data->ktype = ktype;
+        this->m_data->block = block;
+        for (auto& factor : factors) {
+            this->add(std::move(factor));
+        }
+    }
+
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
+#endif /* HKU_SUPPORT_SERIALIZATION */
 };
+
+///////////////////////////////////////////////////////////////////////////////
+// inline impl
+///////////////////////////////////////////////////////////////////////////////
+
+inline const string& FactorSet::name() const noexcept {
+    return m_data->name;
+}
+
+inline void FactorSet::name(const string& name) {
+    m_data->name = name;
+    to_upper(m_data->name);
+}
+
+inline const string& FactorSet::ktype() const noexcept {
+    return m_data->ktype;
+}
+
+inline void FactorSet::ktype(const string& ktype) {
+    for (auto& factor : m_data->factors) {
+        HKU_CHECK(factor.ktype() == ktype, "ktype not match for factor '{}'", factor.name());
+    }
+    m_data->ktype = ktype;
+}
+
+inline const Block& FactorSet::block() const noexcept {
+    return m_data->block;
+}
+
+inline void FactorSet::block(const Block& blk) {
+    m_data->block = blk;
+}
+
+inline size_t FactorSet::size() const noexcept {
+    return m_data->factors.size();
+}
+
+inline bool FactorSet::empty() const noexcept {
+    return m_data->factors.empty();
+}
+
+inline void FactorSet::clear() noexcept {
+    m_data->factors.clear();
+    m_data->nameIndexMap.clear();
+}
+
+inline bool FactorSet::isNull() const noexcept {
+    return !m_data || m_data->name.empty() || m_data->ktype.empty();
+}
+
+inline const Factor& FactorSet::get(size_t i) const {
+    return m_data->factors[i];
+}
+
+inline const Factor& FactorSet::operator[](const string& name) const {
+    return get(name);
+}
+
+inline const Factor& FactorSet::operator[](size_t i) const {
+    return m_data->factors[i];
+}
+
+inline const FactorList& FactorSet::getAllFactors() const {
+    return m_data->factors;
+}
+
+inline FactorSet::const_iterator FactorSet::begin() const {
+    return const_iterator(m_data->factors.begin());
+}
+
+inline FactorSet::const_iterator FactorSet::end() const {
+    return const_iterator(m_data->factors.end());
+}
+
+inline FactorSet::const_iterator FactorSet::cbegin() const {
+    return const_iterator(m_data->factors.cbegin());
+}
+
+inline FactorSet::const_iterator FactorSet::cend() const {
+    return const_iterator(m_data->factors.cend());
+}
 
 typedef vector<FactorSet> FactorSetList;
 

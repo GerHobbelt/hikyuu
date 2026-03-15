@@ -7,6 +7,11 @@
 
 #include "Factor.h"
 #include "hikyuu/plugin/factor.h"
+#include "hikyuu/plugin/device.h"
+#include "hikyuu/StockManager.h"
+#include "hikyuu/indicator/crt/PRICELIST.h"
+#include "hikyuu/indicator/crt/ALIGN.h"
+#include "hikyuu/indicator/imp/IPriceList.h"
 
 namespace hku {
 
@@ -16,44 +21,61 @@ HKU_API std::ostream& operator<<(std::ostream& os, const Factor& factor) {
 }
 
 string Factor::str() const {
-    return m_imp->str();
+    std::ostringstream os;
+    string strip("  \n");
+    os << "Factor(";
+    os << strip << "name: " << name() << strip << "ktype: " << ktype() << strip
+       << "need_persist: " << needPersist() << strip << "create_at: " << createAt().str() << strip
+       << "update_at: " << updateAt().str() << strip << "formula: " << formula().formula() << strip
+       << "brief: " << brief() << strip << "detail: " << details() << strip
+       << "start_date: " << startDate() << strip << "block: " << block() << ")";
+    return os.str();
 }
 
-shared_ptr<FactorImp> Factor::ms_null_factor_imp{make_shared<FactorImp>()};
-
-Factor::Factor() : m_imp(ms_null_factor_imp) {}
+Factor::Factor() : m_data(make_shared<Factor::Data>()) {}
 
 Factor::Factor(const string& name, const KQuery::KType& ktype)
-: m_imp(createFactorImp(name, Indicator(), ktype, "", "", false, Datetime::min(), Block())) {}
+: m_data(make_shared<Data>(name, Indicator(), ktype, "", "", false, Datetime::min(), Block())) {
+    try {
+        load_from_db();
+    } catch (const std::exception& e) {
+        HKU_ERROR("Failed to load factor from db: {}", e.what());
+    }
+}
 
 Factor::Factor(const string& name, const Indicator& formula, const KQuery::KType& ktype,
                const string& brief, const string& details, bool need_persist,
                const Datetime& start_date, const Block& block)
-: m_imp(createFactorImp(name, formula, ktype, brief, details, need_persist, start_date, block)) {}
-
-Factor::Factor(const Factor& other) {
-    m_imp = other.m_imp;
+: m_data(make_shared<Data>(name, formula, ktype, brief, details, need_persist, start_date, block)) {
+    checkFormula();
 }
 
-Factor::Factor(Factor&& other) {
-    m_imp = std::move(other.m_imp);
-    other.m_imp = ms_null_factor_imp;
+void Factor::checkFormula() const {
+    auto imp = formula().getImp();
+    HKU_ERROR_IF(!imp, "Factor formula is null!");
+    IPriceList* pl = dynamic_cast<IPriceList*>(imp.get());
+    HKU_ERROR_IF(pl, "Factor formula can not be PRICLISE!");
 }
 
-Factor& Factor::operator=(const Factor& other) {
+Factor::Factor(const Factor& other) noexcept : m_data(other.m_data) {}
+
+Factor::Factor(Factor&& other) noexcept : m_data(std::move(other.m_data)) {}
+
+Factor& Factor::operator=(const Factor& other) noexcept {
     HKU_IF_RETURN(this == &other, *this);
-    m_imp = other.m_imp;
+    m_data = other.m_data;
     return *this;
 }
 
-Factor& Factor::operator=(Factor&& other) {
+Factor& Factor::operator=(Factor&& other) noexcept {
     HKU_IF_RETURN(this == &other, *this);
-    m_imp = std::move(other.m_imp);
-    other.m_imp = ms_null_factor_imp;
+    m_data = std::move(other.m_data);
     return *this;
 }
 
-IndicatorList Factor::getValues(const StockList& stocks, const KQuery& query, bool check) const {
+IndicatorList Factor::getValues(const StockList& stocks, const KQuery& query, bool align,
+                                bool fill_null, bool tovalue, bool check,
+                                const DatetimeList& align_dates) const {
     if (check) {
         const auto& block = this->block();
         if (!block.empty()) {
@@ -62,13 +84,55 @@ IndicatorList Factor::getValues(const StockList& stocks, const KQuery& query, bo
             }
         }
     }
-    return m_imp->getValues(stocks, query);
+
+    IndicatorList ret;
+    HKU_IF_RETURN(stocks.empty(), ret);
+
+    if (isValidLicense()) {
+        ret = hku::getValues(*this, stocks, query, align, fill_null, tovalue, align_dates);
+        return ret;
+    }
+
+    if (align) {
+        DatetimeList dates =
+          align_dates.empty() ? StockManager::instance().getTradingCalendar(query) : align_dates;
+        HKU_IF_RETURN(dates.empty(), ret);
+        auto null_ind = PRICELIST(PriceList(dates.size(), Null<price_t>()), dates);
+        ret = global_parallel_for_index(0, stocks.size(), [&, tovalue, this](size_t i) {
+            Indicator cur_ind;
+            auto k = stocks[i].getKData(query);
+            HKU_IF_RETURN(k.empty(), null_ind);
+            return tovalue ? ALIGN(formula(), dates, fill_null)(k).getResult(0)
+                           : ALIGN(formula(), dates, fill_null)(k);
+        });
+
+    } else {
+        ret = global_parallel_for_index(0, stocks.size(), [&, tovalue, this](size_t i) {
+            auto k = stocks[i].getKData(query);
+            return tovalue ? formula()(k).getResult(0) : formula()(k);
+        });
+    }
+    return ret;
 }
 
-IndicatorList Factor::getAllValues(const KQuery& query) {
+IndicatorList Factor::getAllValues(const KQuery& query, bool align, bool fill_null, bool tovalue,
+                                   const DatetimeList& align_dates) {
     StockList stocks =
       block().empty() ? StockManager::instance().getStockList() : block().getStockList();
-    return m_imp->getValues(stocks, query);
+    return getValues(stocks, query, align, fill_null, tovalue, false, align_dates);
+}
+
+void Factor::save_to_db() {
+    saveFactor(*this);
+}
+
+void Factor::remove_from_db() {
+    removeFactor(name(), ktype());
+}
+
+void Factor::load_from_db() {
+    Factor tmp = getFactor(name(), ktype());
+    m_data = std::move(tmp.m_data);
 }
 
 }  // namespace hku
