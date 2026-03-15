@@ -412,6 +412,15 @@ public:
         return PositionRecordList();
     }
 
+    /** 获取当前全部持仓记录字典 */
+    std::unordered_map<Stock, PositionRecord> getPositionDict() const {
+        std::unordered_map<Stock, PositionRecord> ret;
+        for (const auto& pos : getPositionList()) {
+            ret[pos.stock] = pos;
+        }
+        return ret;
+    }
+
     /** 获取全部历史持仓记录，即已平仓记录 */
     virtual PositionRecordList getHistoryPositionList() const {
         HKU_WARN("The subclass does not implement this method");
@@ -709,14 +718,14 @@ public:
     }
 
     //-------------------------------------------------------------
-    // 以下为可能需要授权的功能
+    // 以下为捐赠功能
     //-------------------------------------------------------------
     /**
      * 统计截至某一时刻的系统绩效, datetime必须大于等于lastDatetime，
      * 以便用于计算当前市值
      * @param datetime 统计截止时刻
      * @param ktype k线类型
-     * @param ext 是否需要扩展统计项(需要VIP扩展插件)
+     * @param ext 是否需要扩展统计项(捐赠用户)
      */
     Performance getPerformance(const Datetime& datetime = Datetime::now(),
                                const KQuery::KType& ktype = KQuery::DAY, bool ext = true);
@@ -748,6 +757,24 @@ public:
     std::vector<PositionExtInfo> getPositionExtInfoList(
       const Datetime& current_time = Datetime::now(), const KQuery::KType& ktype = KQuery::DAY,
       int trade_mode = 0);
+
+    /**
+     * 获取账户最后交易时刻后持仓详情, 以 Stock 为 key, PositionExtInfo 为 value
+     * @param current_time 当前时刻（需大于等于最后交易时刻）
+     * @param ktype k线类型
+     * @param trade_mode 交易模式，影响部分统计项: 0-收盘时交易, 1-下一开盘时交易
+     */
+    std::unordered_map<Stock, PositionExtInfo> getPositionExtInfoDict(
+      const Datetime& datetime = Datetime::now(), const KQuery::KType& ktype = KQuery::DAY,
+      int trade_mode = 0);
+
+    /**
+     * 获取账户最后交易时刻后持仓详情
+     */
+    PositionExtInfo getPositionExtInfo(const Stock& stock,
+                                       const Datetime& current_time = Datetime::now(),
+                                       const KQuery::KType& ktype = KQuery::DAY,
+                                       int trade_mode = 0);
 
     /**
      * @brief 获取指定截止时间前各月的收益百分比

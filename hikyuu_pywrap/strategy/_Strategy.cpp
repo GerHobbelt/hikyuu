@@ -20,7 +20,7 @@ using namespace hku;
 
 void export_Strategy(py::module& m) {
     Datetime null_date;
-    py::class_<Strategy, StrategyPtr>(m, "Strategy")
+    py::class_<Strategy, StrategyPtr>(m, "Strategy", py::dynamic_attr())
       .def(py::init<>())
       .def(
         py::init<const vector<string>&, const vector<KQuery::KType>&,
@@ -225,6 +225,9 @@ void export_Strategy(py::module& m) {
 
     下一交易时间点（回测使用）)")
 
+      .def("get_current_price", &Strategy::getCurrentPrice, py::arg("stk"), py::arg("ktype"),
+           "获取当前价格，无效时返回 constant.null_price")
+
       .def("get_kdata", &Strategy::getKData, py::arg("stk"), py::arg("start_date"),
            py::arg("end_date"), py::arg("ktype"), py::arg("recover_type") = KQuery::NO_RECOVER,
            R"(get_kdata(self, stk, start_date, end_date, ktype, recover_type)
@@ -273,7 +276,7 @@ void export_Strategy(py::module& m) {
 
       .def("order_value",
            py::overload_cast<const Stock&, price_t, const string&>(&Strategy::orderValue),
-           py::arg("stock"), py::arg("price"), py::arg("remark") = "",
+           py::arg("stock"), py::arg("value"), py::arg("remark") = "",
            R"(order_value(self, stk, value, remark='')
 
     按预期的证劵市值下单，即希望买入多少钱的证券（正数为买入，负数为卖出）

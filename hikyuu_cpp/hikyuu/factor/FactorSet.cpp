@@ -26,8 +26,17 @@ FactorSet::FactorSet(const IndicatorList& inds, const KQuery::KType& ktype)
 : m_data(make_shared<Data>()) {
     m_data->name = fmt::format("FSET_{}", Datetime::now().ticks());
     m_data->ktype = ktype;
-    for (auto& factor : inds) {
+    for (const auto& factor : inds) {
         add(factor);
+    }
+}
+
+FactorSet::FactorSet(const std::unordered_map<string, Indicator>& inds, const KQuery::KType& ktype)
+: m_data(make_shared<Data>()) {
+    m_data->name = fmt::format("FSET_{}", Datetime::now().ticks());
+    m_data->ktype = ktype;
+    for (const auto& item : inds) {
+        add(item.first, item.second);
     }
 }
 
@@ -101,7 +110,7 @@ void FactorSet::add(const IndicatorList& inds) {
 }
 
 void FactorSet::add(const std::map<string, Indicator>& inds) {
-    for (auto& ind : inds) {
+    for (const auto& ind : inds) {
         add(ind.first, ind.second);
     }
 }
@@ -169,7 +178,9 @@ vector<IndicatorList> FactorSet::getValues(const StockList& stocks, const KQuery
     }
 
     vector<IndicatorList> result;
-    if (isValidLicense()) {
+    const string& driver_type =
+      StockManager::instance().getKDataDriverParameter().get<const string&>("type");
+    if (driver_type == "clickhouse") {
         result = hku::getValues(*this, stocks, query, align, fill_null, tovalue, align_dates);
         return result;
     }

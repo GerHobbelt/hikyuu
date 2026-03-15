@@ -52,6 +52,12 @@ public:
     /** 重新加载 */
     void reload();
 
+    /**
+     * 带策略上下文参数的重新加载, 如果context中证券列表为空，将沿用原有context
+     * @param context 策略上下文
+     */
+    void reloadWith(const StrategyContext& context);
+
     /** 主动退出并释放资源 */
     static void quit();
 
@@ -339,7 +345,8 @@ private:
 
 private:
     static StockManager* m_sm;
-    std::atomic_bool m_initializing{false};
+    std::mutex m_init_mutex;
+    bool m_initializing{false};
     std::atomic_bool m_cancel_load{false};  // 取消加载, 用于退出指示
     std::atomic_bool m_data_ready{true};    // 用于指示是否所有数据准备完毕, 如果未初始化则为 true
     std::thread::id m_thread_id;  // 记录线程id，用于判断Stratege是以独立进程方式还是线程方式运行

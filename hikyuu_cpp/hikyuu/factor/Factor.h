@@ -32,11 +32,15 @@ public:
      * @param ktype K线类型
      * @param brief 简要描述
      * @param details 详细描述
-     * @param need_persist 是否需要持久化
+     * @param start_date 因子数据起始日期
+     * @param save_value 是否需要持久化保存因子值数据
+     * @param block 板块信息，证券集合，如果为空，为全部
+     * @param recover_type 复权方式
      */
     Factor(const string& name, const Indicator& formula, const KQuery::KType& ktype = KQuery::DAY,
-           const string& brief = "", const string& details = "", bool need_persist = false,
-           const Datetime& start_date = Datetime::min(), const Block& block = Block());
+           const string& brief = "", const string& details = "", bool save_value = false,
+           const Datetime& start_date = Datetime::min(), const Block& block = Block(),
+           KQuery::RecoverType recover_type = KQuery::RecoverType::NO_RECOVER);
 
     Factor(const Factor& other) noexcept;
     Factor(Factor&& other) noexcept;
@@ -44,6 +48,21 @@ public:
 
     Factor& operator=(const Factor& other) noexcept;
     Factor& operator=(Factor&& other) noexcept;
+
+    /**
+     * 获取指定股票的指定查询参数的计算结果
+     * @param stock 证券
+     * @param query 查询参数
+     * @param align 是否对齐日期（按指定 align_dates 或默认交易日历)，默认 false
+     * @param fill_null 是否填充空值，默认 false
+     * @param tovalue 是否转换为数值，默认 false
+     * @param check 是否检查股票属于自身指定的 block，默认 false
+     * @param align_dates 对齐日期列表，默认为空
+     * @return 计算结果指标
+     */
+    Indicator getValue(const Stock& stock, const KQuery& query, bool align = false,
+                       bool fill_null = false, bool tovalue = false, bool check = false,
+                       const DatetimeList& align_dates = {}) const;
 
     /**
      * 获取指定股票列表的指定查询参数的计算结果
@@ -80,6 +99,10 @@ public:
 
     void ktype(const string& ktype);
 
+    KQuery::RecoverType recoverType() const noexcept;
+
+    void recoverType(KQuery::RecoverType recover_type);
+
     const Indicator& formula() const noexcept;
 
     void formula(const Indicator& formula);
@@ -100,9 +123,9 @@ public:
 
     void updateAt(const Datetime& datetime);
 
-    bool needPersist() const noexcept;
+    bool needSaveValue() const noexcept;
 
-    void needPersist(bool flag);
+    void needSaveValue(bool flag);
 
     const string& brief() const noexcept;
 
@@ -125,7 +148,16 @@ public:
     void save_to_db();
 
     /**
-     * 从数据库中删除因子及其数据
+     * 特殊因子保存值到数据库, 其值不是不通过指标计算，如: PRICELIST，需要自行指定设置
+     */
+    void save_special_values_to_db(const Stock& stock, const DatetimeList& dates,
+                                   const PriceList& values, bool replace = false);
+
+    void save_special_values_to_db(const Stock& stock, const Indicator& values,
+                                   bool replace = false);
+
+    /**
+     * 从数据库中删除因子及其数据, 注：为防止误操作，特殊因子的值不会删除，需自行手工删除
      */
     void remove_from_db();
 
@@ -135,35 +167,34 @@ public:
     void load_from_db();
 
 private:
-    // 检查是否指标原型是否可作为因子
-    void checkFormula() const;
-
-private:
     struct Data {
-        string name;               ///< 因子名称
-        string ktype;              ///< K线类型
-        string brief;              ///< 简要描述
-        string details;            ///< 详细描述
-        Datetime create_at;        ///< 创建时间
-        Datetime update_at;        ///< 更新时间
-        Datetime start_date;       ///< 开始日期，数据存储时的起始日期
-        Indicator formula;         ///< 计算公式指标
-        Block block;               ///< 板块信息，证券集合，如果为空，为全部
-        bool need_persist{false};  ///< 是否需要持久化
+        string name;                  ///< 因子名称
+        string ktype;                 ///< K线类型
+        string brief;                 ///< 简要描述
+        string details;               ///< 详细描述
+        Datetime create_at;           ///< 创建时间
+        Datetime update_at;           ///< 更新时间
+        Datetime start_date;          ///< 开始日期，数据存储时的起始日期
+        Indicator formula;            ///< 计算公式指标
+        Block block;                  ///< 板块信息，证券集合，如果为空，为全部
+        bool need_save_value{false};  ///< 是否需要持久化保存因子值数据
+        KQuery::RecoverType recover_type{KQuery::RecoverType::NO_RECOVER};
 
         Data() = default;
         Data(const string& name, const Indicator& formula, const KQuery::KType& ktype,
-             const string& brief, const string& details, bool need_persist,
-             const Datetime& start_date, const Block& block)
+             const string& brief, const string& details, bool need_save_value,
+             const Datetime& start_date, const Block& block, KQuery::RecoverType recover_type)
         : name(name),
           ktype(ktype),
           brief(brief),
           details(details),
           start_date(start_date),
-          formula(formula),
+          formula(formula.clone()),
           block(block),
-          need_persist(need_persist) {
+          need_save_value(need_save_value),
+          recover_type(recover_type) {
             to_upper(this->name);
+            this->formula.setContext(KData());
             this->formula.name(this->name);
             if (this->start_date == Null<Datetime>()) {
                 this->start_date = Datetime::min();
@@ -195,8 +226,10 @@ private:
         ar& BOOST_SERIALIZATION_NVP(brief);
         string details = this->details();
         ar& BOOST_SERIALIZATION_NVP(details);
-        bool needPersist = this->needPersist();
-        ar& BOOST_SERIALIZATION_NVP(needPersist);
+        bool needSaveValue = this->needSaveValue();
+        ar& BOOST_SERIALIZATION_NVP(needSaveValue);
+        KQuery::RecoverType recover_type = this->recoverType();
+        ar& BOOST_SERIALIZATION_NVP(recover_type);
     }
 
     template <class Archive>
@@ -210,7 +243,8 @@ private:
         Datetime updateAt;
         string brief;
         string details;
-        bool needPersist;
+        bool needSaveValue;
+        KQuery::RecoverType recover_type;
         ar& BOOST_SERIALIZATION_NVP(name);
         ar& BOOST_SERIALIZATION_NVP(ktype);
         ar& BOOST_SERIALIZATION_NVP(formula);
@@ -220,9 +254,10 @@ private:
         ar& BOOST_SERIALIZATION_NVP(updateAt);
         ar& BOOST_SERIALIZATION_NVP(brief);
         ar& BOOST_SERIALIZATION_NVP(details);
-        ar& BOOST_SERIALIZATION_NVP(needPersist);
-        this->m_data =
-          make_shared<Data>(name, formula, ktype, brief, details, needPersist, startDate, block);
+        ar& BOOST_SERIALIZATION_NVP(needSaveValue);
+        ar& BOOST_SERIALIZATION_NVP(recover_type);
+        this->m_data = make_shared<Data>(name, formula, ktype, brief, details, needSaveValue,
+                                         startDate, block, recover_type);
         this->createAt(createAt);
         this->updateAt(updateAt);
     }
@@ -251,6 +286,14 @@ inline const string& Factor::ktype() const noexcept {
 
 inline void Factor::ktype(const string& ktype) {
     m_data->ktype = ktype;
+}
+
+inline KQuery::RecoverType Factor::recoverType() const noexcept {
+    return m_data->recover_type;
+}
+
+inline void Factor::recoverType(KQuery::RecoverType recover_type) {
+    m_data->recover_type = recover_type;
 }
 
 inline const Indicator& Factor::formula() const noexcept {
@@ -294,12 +337,12 @@ inline void Factor::updateAt(const Datetime& datetime) {
     m_data->update_at = datetime;
 }
 
-inline bool Factor::needPersist() const noexcept {
-    return m_data->need_persist;
+inline bool Factor::needSaveValue() const noexcept {
+    return m_data->need_save_value;
 }
 
-inline void Factor::needPersist(bool flag) {
-    m_data->need_persist = flag;
+inline void Factor::needSaveValue(bool flag) {
+    m_data->need_save_value = flag;
 }
 
 inline const string& Factor::brief() const noexcept {

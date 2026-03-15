@@ -23,6 +23,8 @@
 #include "plugin/interface/plugins.h"
 #include "plugin/device.h"
 #include "plugin/hkuextra.h"
+#include "plugin/extind.h"
+#include "global/sysinfo.h"
 
 namespace hku {
 StockManager* StockManager::m_sm = nullptr;
@@ -70,6 +72,7 @@ static void registerPredefinedExtraKType() {
 void StockManager::init(const Parameter& baseInfoParam, const Parameter& blockParam,
                         const Parameter& kdataParam, const Parameter& preloadParam,
                         const Parameter& hikyuuParam, const StrategyContext& context) {
+    std::lock_guard<std::mutex> lock(m_init_mutex);
     HKU_WARN_IF_RETURN(m_initializing, void(),
                        "The last initialization has not finished. Please try again later!");
 
@@ -101,13 +104,15 @@ void StockManager::init(const Parameter& baseInfoParam, const Parameter& blockPa
     // 设置插件路径
     auto plugin_path = getPluginPath();
     if (plugin_path.empty() || plugin_path == ".") {
-        m_plugin_manager.pluginPath(m_hikyuuParam.tryGet<string>(
-          "plugindir", fmt::format("{}/.hikyuu/plugin", getUserDir())));
+        m_plugin_manager.pluginPath("./plugin");
     }
     HKU_INFO(htr("Plugin path: {}", getPluginPath()));
 
     // 注册扩展K线处理
     registerPredefinedExtraKType();
+
+    StockManager::instance().getPlugin<ExtendIndicatorsPluginInterface>(
+      HKU_PLUGIN_EXTEND_INDICATOR);
 
     string basedrivername = m_baseInfoDriverParam.tryGet<string>("type", "");
     to_lower(basedrivername);
@@ -181,6 +186,9 @@ void StockManager::loadData() {
 
     // 加载K线及历史财务信息
     loadAllKData();
+
+    // 更新 license expire time
+    updateSysInfoExpiredTime(getExpireDate());
 
     std::chrono::duration<double> sec = std::chrono::system_clock::now() - start_time;
     auto seconds = sec.count();
@@ -419,6 +427,21 @@ std::unordered_set<string> StockManager::tryLoadAllKDataFromColumnFirst(
 void StockManager::reload() {
     HKU_IF_RETURN(m_initializing, void());
     m_initializing = true;
+
+    HKU_INFO("start reload ...");
+    loadData();
+    m_initializing = false;
+}
+
+void StockManager::reloadWith(const StrategyContext& context) {
+    HKU_IF_RETURN(m_initializing, void());
+    m_initializing = true;
+
+    if (!context.empty()) {
+        m_context = context;
+    } else {
+        HKU_INFO(htr("The new context is empty, use the original context"));
+    }
 
     HKU_INFO("start reload ...");
     loadData();

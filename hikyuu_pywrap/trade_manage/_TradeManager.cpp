@@ -377,6 +377,12 @@ void export_TradeManager(py::module& m) {
 
     :rtype: PositionRecordList)")
 
+      .def("get_positions", &TradeManagerBase::getPositionDict, R"(get_positions(self)
+
+    以字典方式获取当前全部持仓记录，stock为key，PositionRecord为value
+
+    :rtype: dict)")
+
       .def("get_history_position_list", &TradeManagerBase::getHistoryPositionList,
            R"(get_history_position_list(self)
 
@@ -599,7 +605,7 @@ void export_TradeManager(py::module& m) {
 
     :param Datetime datetime: 指定时刻
     :param Query.KType ktype: K线类型
-    :param bool ext: 是否获取扩展统计项(需VIP权限)，否则仍旧为基础统计项
+    :param bool ext: 是否获取扩展统计项(捐赠用户)，否则仍旧为基础统计项
     :return: 账户表现)")
 
       .def("get_max_pull_back", &TradeManagerBase::getMaxPullBack,
@@ -613,11 +619,58 @@ void export_TradeManager(py::module& m) {
     :return: 最大回撤百分比)")
 
       .def(
+        "get_position_ext_info", &TradeManagerBase::getPositionExtInfo, py::arg("stock"),
+        py::arg("current_time"), py::arg("ktype") = KQuery::DAY, py::arg("trade_mode") = 0,
+        R"(get_position_ext_info(self, stock, current_time, ktype=Query.DAY, trade_mode=0) -> PositionExtInfo)
+
+        获取账户指定时刻的扩展持仓详情（仅针对指定股票）
+
+        :param Stock stock: 指定股票
+        :param Datetime current_time: 当前时刻（需大于等于最后交易时刻）
+        :param Query.KType ktype: K 线类型，默认日线
+        :param int trade_mode: 交易模式，影响部分统计项：0-收盘时交易，1-下一开盘时交易，默认 0
+        :return: 扩展持仓详情，包含以下字段：
+        
+            - position (PositionRecord): 基础持仓记录
+            - max_high_price (float): 期间最高价最大值
+            - min_low_price (float): 期间最低价最小值
+            - max_close_price (float): 期间收盘价最高值
+            - min_close_price (float): 期间收盘价最低值
+            - current_close_price (float): 当前收盘价
+            - max_pull_back1 (float): 最大回撤百分比 1（仅使用最大收盘价和最低收盘价计算）（负数）
+            - max_pull_back2 (float): 最大回撤百分比 2（使用期间最高价最大值和最低价最小值计算）（负数）
+            - current_profit (float): 当前浮动盈亏（不含预计卖出成本）
+            
+            以及以下计算方法：
+            
+            - current_pull_back1(): 当前回撤百分比 1（仅使用最大收盘价和当前收盘价计算）
+            - current_pull_back2(): 当前回撤百分比 2（使用期间最高价最大值和当前收盘价计算）
+            - max_floating_profit1(): 期间最大浮盈百分比 1（仅使用收盘价计算，不含预计卖出成本，多次买卖时统计不准）
+            - max_floating_profit2(): 期间最大浮盈百分比 2（使用最高价最大值进行计算，不含预计卖出成本，多次买卖时统计不准）
+            - min_loss_profit1(): 期间最大浮亏百分比 1（仅使用收盘价计算，不含预计卖出成本，多次买卖时统计不准）
+            - min_loss_profit2(): 期间最大浮亏百分比 2（仅使用期间最低价计算，不含预计卖出成本，多次买卖时统计不准）
+            
+        :note: 该功能只适合一买一卖的情况，对于一买多卖的情况，部分统计可能不准确，仅供参考
+        )")
+
+      .def(
         "get_position_ext_info_list", &TradeManagerBase::getPositionExtInfoList,
         py::arg("current_time"), py::arg("ktype") = KQuery::DAY, py::arg("trade_mode") = 0,
         R"(get_position_ext_info_list(self, current_time, ktype=Query.DAY, trade_mode=0) -> list[PositionExtInfo])
           
     获取账户最后交易时刻之后指定时间的持仓详情（未平常记录）
+ 
+    :param Datetime current_time: 当前时刻（需大于等于最后交易时刻）
+    :param Query.KType ktype: k线类型
+    :param int trade_mode: 交易模式，影响部分统计项: 0-收盘时交易, 1-下一开盘时交易
+    :return: 持仓扩展详情列表)")
+
+      .def(
+        "get_position_ext_info", &TradeManagerBase::getPositionExtInfoDict, py::arg("current_time"),
+        py::arg("ktype") = KQuery::DAY, py::arg("trade_mode") = 0,
+        R"(get_position_ext_info_list(self, current_time, ktype=Query.DAY, trade_mode=0) -> list[PositionExtInfo])
+          
+    获取账户最后交易时刻之后指定时间的持仓详情, 以字典返回，stock 为 key, PositionExtInfo 为 value
  
     :param Datetime current_time: 当前时刻（需大于等于最后交易时刻）
     :param Query.KType ktype: k线类型

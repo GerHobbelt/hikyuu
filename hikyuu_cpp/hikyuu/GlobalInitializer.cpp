@@ -30,6 +30,7 @@
 #include "global/schedule/scheduler.h"
 #include "indicator/IndicatorImp.h"
 #include "global/sysinfo.h"
+#include "plugin/interface/plugins.h"
 #include "debug.h"
 
 #if HKU_ENABLE_TA_LIB
@@ -105,6 +106,7 @@ void GlobalInitializer::init() {
 
     DataDriverFactory::init();
     StockManager::instance();
+
     getGlobalSpotAgent();
 }
 
@@ -122,6 +124,8 @@ void GlobalInitializer::clean() {
           info.version, info.version, info.remark);
     }
 #endif
+
+    reminderLicenseExpiration();
 
     StockManager &sm = StockManager::instance();
     sm.cancelLoad();

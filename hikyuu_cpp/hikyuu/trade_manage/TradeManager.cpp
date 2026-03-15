@@ -477,8 +477,10 @@ bool TradeManager::checkinStock(const Datetime& datetime, const Stock& stock, pr
     price_t market_value = roundEx(price * number * stock.unit(), precision);
     position_map_type::iterator pos_iter = m_position.find(stock.id());
     if (pos_iter == m_position.end()) {
-        m_position[stock.id()] = PositionRecord(stock, datetime, Null<Datetime>(), number, 0.0, 0.0,
-                                                number, market_value, 0.0, 0.0, 0.0);
+        PositionRecord pos(stock, datetime, Null<Datetime>(), number, 0.0, 0.0, number,
+                           market_value, 0.0, 0.0, 0.0);
+        pos.buyCount = 1;
+        m_position[stock.id()] = pos;
     } else {
         PositionRecord& pos = pos_iter->second;
         pos.number += number;
@@ -488,6 +490,7 @@ bool TradeManager::checkinStock(const Datetime& datetime, const Stock& stock, pr
         // pos.totalCost 不变
         // pos.totalRisk 不变
         // pos.sellMoney 不变
+        pos.buyCount++;
     }
 
     // 加入交易记录
@@ -527,6 +530,7 @@ bool TradeManager::checkoutStock(const Datetime& datetime, const Stock& stock, p
     int precision = getParam<int>("precision");
     pos.number -= number;
     pos.sellMoney = roundEx(pos.sellMoney + price * number * stock.unit(), precision);
+    pos.sellCount++;
 
     // 取出后当前所有持仓数量为0，清除当前持仓，存入历史持仓
     if (0 == pos.number) {
@@ -842,9 +846,11 @@ TradeRecord TradeManager::buy(const Datetime& datetime, const Stock& stock, pric
     // 更新当前持仓记录
     position_map_type::iterator pos_iter = m_position.find(stock.id());
     if (pos_iter == m_position.end()) {
-        m_position[stock.id()] = PositionRecord(
+        PositionRecord position(
           stock, datetime, Null<Datetime>(), number, stoploss, goalPrice, number, money, cost.total,
           roundEx((realPrice - stoploss) * number * stock.unit(), precision), 0.0);
+        position.buyCount = 1;
+        m_position[stock.id()] = position;
     } else {
         PositionRecord& position = pos_iter->second;
         position.number += number;
@@ -855,6 +861,7 @@ TradeRecord TradeManager::buy(const Datetime& datetime, const Stock& stock, pric
         position.totalCost = roundEx(cost.total + position.totalCost, precision);
         position.totalRisk =
           roundEx(position.totalRisk + (realPrice - stoploss) * number * stock.unit(), precision);
+        position.buyCount++;
     }
 
     if (datetime > m_broker_last_datetime) {
@@ -934,6 +941,7 @@ TradeRecord TradeManager::sell(const Datetime& datetime, const Stock& stock, pri
     // position.buyMoney = position.buyMoney;
     position.totalCost = roundEx(position.totalCost + cost.total, precision);
     position.sellMoney = roundEx(position.sellMoney + money, precision);
+    position.sellCount++;
 
     if (position.number == 0) {
         position.cleanDatetime = datetime;
@@ -1047,9 +1055,10 @@ TradeRecord TradeManager::sellShort(const Datetime& datetime, const Stock& stock
     price_t risk = roundEx((stoploss - realPrice) * sell_num * stock.unit(), precision);
 
     if (pos_iter == m_short_position.end()) {
-        m_short_position[stock.id()] =
-          PositionRecord(stock, datetime, Null<Datetime>(), sell_num, stoploss, goalPrice, sell_num,
-                         cost.total, cost.total, risk, money);
+        PositionRecord position(stock, datetime, Null<Datetime>(), sell_num, stoploss, goalPrice,
+                                sell_num, cost.total, cost.total, risk, money);
+        position.sellCount = 1;
+        m_short_position[stock.id()] = position;
     } else {
         PositionRecord& position = pos_iter->second;
         position.number += sell_num;
@@ -1060,6 +1069,7 @@ TradeRecord TradeManager::sellShort(const Datetime& datetime, const Stock& stock
         position.totalCost = roundEx(cost.total + position.totalCost, precision);
         position.totalRisk = roundEx(position.totalRisk + risk, precision);
         position.sellMoney = roundEx(position.sellMoney + money, precision);
+        position.sellCount++;
     }
 
     if (datetime > m_broker_last_datetime) {
@@ -1128,6 +1138,7 @@ TradeRecord TradeManager::buyShort(const Datetime& datetime, const Stock& stock,
     position.buyMoney = roundEx(position.buyMoney + money + cost.total, precision);
     position.totalCost = roundEx(position.totalCost + cost.total, precision);
     // position.sellMoney = roundEx(position.sellMoney, precision);
+    position.buyCount++;
 
     if (position.number == 0) {
         position.cleanDatetime = datetime;
@@ -1685,7 +1696,8 @@ void TradeManager::tocsv(const string& path) {
     file.open(filename2.c_str());
     HKU_ERROR_IF_RETURN(!file, void(), "Can't create file {}!", filename2);
     file << "#建仓日期,平仓日期,证券代码,证券名称,累计持仓数量,"
-            "累计花费资金,累计交易成本,已转化资金,总盈利,累积风险,赢亏比率,持仓天数"
+            "累计花费资金,累计交易成本,已转化资金,总盈利,累积风险,赢亏比率,持仓天数,累计买入次数,"
+            "累计卖出次数"
          << std::endl;
     PositionRecordList::const_iterator history_iter = m_position_history.begin();
     for (; history_iter != m_position_history.end(); ++history_iter) {
@@ -1696,7 +1708,8 @@ void TradeManager::tocsv(const string& path) {
              << record.sellMoney << sep << record.sellMoney - record.totalCost - record.buyMoney
              << sep << record.totalRisk << sep
              << record.totalProfit() / (record.buyMoney + record.totalCost) << sep
-             << (record.cleanDatetime - record.takeDatetime).days() << std::endl;
+             << (record.cleanDatetime - record.takeDatetime).days() << sep << record.buyCount << sep
+             << record.sellCount << std::endl;
     }
     file.close();
 
@@ -1704,7 +1717,7 @@ void TradeManager::tocsv(const string& path) {
     file.open(filename3.c_str());
     HKU_ERROR_IF_RETURN(!file, void(), "Can't create file {}!", filename3);
     file << "#建仓日期,平仓日期,证券代码,证券名称,当前持仓数量,累计持仓数量,"
-            "累计花费资金,累计交易成本,已转化资金,累积风险,"
+            "累计花费资金,累计交易成本,已转化资金,累积风险,累计买入次数,累计卖出次数,"
             "累计浮动盈亏,当前盈亏成本价, 浮动盈亏比率"
          << std::endl;
     position_map_type::const_iterator position_iter = m_position.begin();
@@ -1713,7 +1726,8 @@ void TradeManager::tocsv(const string& path) {
         file << record.takeDatetime << sep << record.cleanDatetime << sep
              << record.stock.market_code() << sep << record.stock.name() << sep << record.number
              << sep << record.totalNumber << sep << record.buyMoney << sep << record.totalCost
-             << sep << record.sellMoney << sep << record.totalRisk << sep;
+             << sep << record.sellMoney << sep << record.totalRisk << sep << record.buyCount << sep
+             << record.sellCount << sep;
         size_t pos = record.stock.getCount(KQuery::DAY);
         if (pos != 0) {
             KRecord krecord = record.stock.getKRecord(pos - 1, KQuery::DAY);
@@ -1855,10 +1869,12 @@ bool TradeManager::_add_buy_tr(const TradeRecord& tr) {
     // 更新当前持仓记录
     position_map_type::iterator pos_iter = m_position.find(tr.stock.id());
     if (pos_iter == m_position.end()) {
-        m_position[tr.stock.id()] = PositionRecord(
+        PositionRecord position(
           tr.stock, tr.datetime, Null<Datetime>(), tr.number, tr.stoploss, tr.goalPrice, tr.number,
           money, tr.cost.total,
           roundEx((tr.realPrice - tr.stoploss) * tr.number * tr.stock.unit(), precision), 0.0);
+        position.buyCount = 1;
+        m_position[tr.stock.id()] = position;
     } else {
         PositionRecord& position = pos_iter->second;
         position.number += tr.number;
@@ -1870,6 +1886,8 @@ bool TradeManager::_add_buy_tr(const TradeRecord& tr) {
         position.totalRisk =
           roundEx(position.totalRisk + (tr.realPrice - tr.stoploss) * tr.number * tr.stock.unit(),
                   precision);
+        position.buyCount++;
+        ;
     }
 
     _saveAction(new_tr);
@@ -1908,6 +1926,7 @@ bool TradeManager::_add_sell_tr(const TradeRecord& tr) {
     // position.buyMoney = position.buyMoney;
     position.totalCost = roundEx(position.totalCost + tr.cost.total, precision);
     position.sellMoney = roundEx(position.sellMoney + money, precision);
+    position.sellCount++;
 
     if (position.number == 0) {
         position.cleanDatetime = tr.datetime;

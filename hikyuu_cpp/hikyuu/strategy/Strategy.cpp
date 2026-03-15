@@ -18,13 +18,28 @@
 namespace hku {
 
 std::atomic_bool Strategy::ms_keep_running = true;
+std::atomic<bool> Strategy::ms_sig_registered = false;
 
 void Strategy::sig_handler(int sig) {
     if (sig == SIGINT || sig == SIGTERM) {
-        ms_keep_running = false;
-        auto* scheduler = getScheduler();
-        scheduler->stop();
-        exit(0);
+        try {
+            ms_keep_running = false;
+            auto* scheduler = getScheduler();
+            scheduler->stop();
+        } catch (...) {
+            // 忽略异常
+        }
+        std::exit(EXIT_SUCCESS);
+    }
+}
+
+void Strategy::register_signal() {
+    // 确保只注册一次
+    bool expected = false;
+    if (ms_sig_registered.compare_exchange_strong(expected, true)) {
+        if (std::signal(SIGINT, sig_handler) == SIG_ERR) {
+            ms_sig_registered.store(false);
+        }
     }
 }
 
@@ -90,7 +105,8 @@ void Strategy::_init() {
     if (sm.thread_id() == std::thread::id()) {
         // 注册 ctrl-c 终止信号
         if (!runningInPython()) {
-            std::signal(SIGINT, sig_handler);
+            // std::signal(SIGINT, sig_handler);
+            register_signal();
         }
 
         CLS_INFO("{} is running! You can press Ctrl-C to terminte ...", m_name);
@@ -100,6 +116,10 @@ void Strategy::_init() {
 
     } else {
         m_context = sm.getStrategyContext();
+    }
+
+    if (!runningInPython()) {
+        register_signal();
     }
 
     CLS_CHECK(!m_context.getStockCodeList().empty(), "The context does not contain any stocks!");
@@ -339,6 +359,13 @@ void Strategy::_startEventLoop() {
     }
 }
 
+price_t Strategy::getCurrentPrice(const Stock& stk, const KQuery::KType& ktype) const {
+    KData k = getLastKData(stk, 1, ktype);
+    HKU_IF_RETURN(k.empty(), Null<price_t>());
+    const auto& kr = k.front();
+    return kr.datetime.startOfDay() != today() ? Null<price_t>() : kr.closePrice;
+}
+
 KData Strategy::getKData(const Stock& stk, const Datetime& start_date, const Datetime& end_date,
                          const KQuery::KType& ktype, KQuery::RecoverType recover_type) const {
     Datetime new_end_date = end_date;
@@ -372,20 +399,21 @@ TradeRecord Strategy::order(const Stock& stk, double num, const string& remark) 
     double min_trade_num = stk.minTradeNumber();
     double max_trade_num = stk.maxTradeNumber();
     if (num > 0.0) {
-        HKU_WARN_IF_RETURN(num < min_trade_num, ret,
-                           "{} {} order num({}) is less than min trade number({})!",
-                           stk.market_code(), stk.name(), num, min_trade_num);
-        double buy_num = num;
+        // HKU_WARN_IF_RETURN(num < min_trade_num, ret,
+        //                    "Ignore! {} {} order num({}) is less than min trade number({})!",
+        //                    stk.market_code(), stk.name(), num, min_trade_num);
+        HKU_IF_RETURN(num < min_trade_num, ret);
+        double buy_num = int64_t(num / min_trade_num) * min_trade_num;
         if (buy_num > max_trade_num) {
             buy_num = max_trade_num;
         }
         ret = buy(stk, 0.0, num, 0.0, 0.0, SystemPart::PART_SIGNAL, remark);
 
     } else {
-        double sell_num = std::abs(num);
+        double sell_num = int64_t(std::abs(num) / min_trade_num) * min_trade_num;
         if (sell_num > max_trade_num && sell_num != MAX_DOUBLE) {
             sell_num = max_trade_num;
-        } else if (sell_num < min_trade_num) {
+        } else if ((sell_num + num) < min_trade_num) {
             sell_num = MAX_DOUBLE;  // 指示卖出剩余全部
         }
         ret = sell(stk, 0.0, sell_num, 0.0, 0.0, SystemPart::PART_SIGNAL, remark);

@@ -26,6 +26,15 @@ public:
      */
     explicit FactorSet(const IndicatorList& inds, const KQuery::KType& ktype = KQuery::DAY);
 
+    /**
+     * 构造函数，使用指定的指标映射表创建因子集合
+     * @note 同名的指标会被覆盖，最终保留最后一个同名指标
+     * @param inds 指标映射表，key 为因子名称，value 为对应的指标
+     * @param ktype 因子集合的 K 线类型，默认为日线
+     */
+   explicit FactorSet(const std::unordered_map<string, Indicator>& inds,
+                       const KQuery::KType& ktype = KQuery::DAY);
+
     FactorSet(const FactorSet& other);
     FactorSet(FactorSet&& other);
     virtual ~FactorSet() = default;
@@ -98,7 +107,7 @@ public:
     /** 便捷方法：添加一个指标，并以指定的名称作为因子名称 */
     void add(const string& name, const Indicator& ind);
 
-    /** 便捷方法：添加一个指标, 以指标名作为因子名称。容易出现存在同名的指标抛出异常 */
+    /** 便捷方法：添加一个指标, 以指标名作为因子名称。注意：同名指标后者会覆盖先加入的指标 */
     void add(const Indicator& ind);
 
     void add(const IndicatorList& inds);
@@ -180,7 +189,7 @@ public:
 private:
     struct HKU_API Data {
         string name;
-        string ktype;
+        string ktype{KQuery::DAY};
         Block block;
         vector<Factor> factors;                      // 保持插入顺序
         unordered_map<string, size_t> nameIndexMap;  // 名称到索引的映射，用于快速查找
@@ -271,7 +280,7 @@ inline void FactorSet::clear() noexcept {
 }
 
 inline bool FactorSet::isNull() const noexcept {
-    return !m_data || m_data->name.empty() || m_data->ktype.empty();
+    return !m_data;
 }
 
 inline const Factor& FactorSet::get(size_t i) const {

@@ -25,9 +25,10 @@ string Factor::str() const {
     string strip("  \n");
     os << "Factor(";
     os << strip << "name: " << name() << strip << "ktype: " << ktype() << strip
-       << "need_persist: " << needPersist() << strip << "create_at: " << createAt().str() << strip
-       << "update_at: " << updateAt().str() << strip << "formula: " << formula().formula() << strip
-       << "brief: " << brief() << strip << "detail: " << details() << strip
+       << "recover_type: " << KQuery::getRecoverTypeName(recoverType()) << strip
+       << "need_save_value: " << needSaveValue() << strip << "create_at: " << createAt().str()
+       << strip << "update_at: " << updateAt().str() << strip << "formula: " << formula().formula()
+       << strip << "brief: " << brief() << strip << "detail: " << details() << strip
        << "start_date: " << startDate() << strip << "block: " << block() << ")";
     return os.str();
 }
@@ -35,7 +36,8 @@ string Factor::str() const {
 Factor::Factor() : m_data(make_shared<Factor::Data>()) {}
 
 Factor::Factor(const string& name, const KQuery::KType& ktype)
-: m_data(make_shared<Data>(name, Indicator(), ktype, "", "", false, Datetime::min(), Block())) {
+: m_data(make_shared<Data>(name, Indicator(), ktype, "", "", false, Datetime::min(), Block(),
+                           KQuery::RecoverType::NO_RECOVER)) {
     try {
         load_from_db();
     } catch (const std::exception& e) {
@@ -44,18 +46,10 @@ Factor::Factor(const string& name, const KQuery::KType& ktype)
 }
 
 Factor::Factor(const string& name, const Indicator& formula, const KQuery::KType& ktype,
-               const string& brief, const string& details, bool need_persist,
-               const Datetime& start_date, const Block& block)
-: m_data(make_shared<Data>(name, formula, ktype, brief, details, need_persist, start_date, block)) {
-    checkFormula();
-}
-
-void Factor::checkFormula() const {
-    auto imp = formula().getImp();
-    HKU_ERROR_IF(!imp, "Factor formula is null!");
-    IPriceList* pl = dynamic_cast<IPriceList*>(imp.get());
-    HKU_ERROR_IF(pl, "Factor formula can not be PRICLISE!");
-}
+               const string& brief, const string& details, bool need_save_value,
+               const Datetime& start_date, const Block& block, KQuery::RecoverType recover_type)
+: m_data(make_shared<Data>(name, formula, ktype, brief, details, need_save_value, start_date, block,
+                           recover_type)) {}
 
 Factor::Factor(const Factor& other) noexcept : m_data(other.m_data) {}
 
@@ -73,6 +67,12 @@ Factor& Factor::operator=(Factor&& other) noexcept {
     return *this;
 }
 
+Indicator Factor::getValue(const Stock& stock, const KQuery& query, bool align, bool fill_null,
+                           bool tovalue, bool check, const DatetimeList& align_dates) const {
+    auto inds = getValues({stock}, query, align, fill_null, tovalue, check, align_dates);
+    return inds.empty() ? Indicator() : inds.front();
+}
+
 IndicatorList Factor::getValues(const StockList& stocks, const KQuery& query, bool align,
                                 bool fill_null, bool tovalue, bool check,
                                 const DatetimeList& align_dates) const {
@@ -88,7 +88,9 @@ IndicatorList Factor::getValues(const StockList& stocks, const KQuery& query, bo
     IndicatorList ret;
     HKU_IF_RETURN(stocks.empty(), ret);
 
-    if (isValidLicense()) {
+    const string& driver_type =
+      StockManager::instance().getKDataDriverParameter().get<const string&>("type");
+    if (driver_type == "clickhouse") {
         ret = hku::getValues(*this, stocks, query, align, fill_null, tovalue, align_dates);
         return ret;
     }
@@ -124,6 +126,16 @@ IndicatorList Factor::getAllValues(const KQuery& query, bool align, bool fill_nu
 
 void Factor::save_to_db() {
     saveFactor(*this);
+}
+
+void Factor::save_special_values_to_db(const Stock& stock, const DatetimeList& dates,
+                                       const PriceList& values, bool replace) {
+    saveSpecialFactorValues(*this, stock, dates, values, replace);
+}
+
+void Factor::save_special_values_to_db(const Stock& stock, const Indicator& values, bool replace) {
+    saveSpecialFactorValues(*this, stock, values.getDatetimeList(), values.getResultAsPriceList(0),
+                            replace);
 }
 
 void Factor::remove_from_db() {
