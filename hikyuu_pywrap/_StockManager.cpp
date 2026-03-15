@@ -259,14 +259,27 @@ void export_StockManager(py::module& m) {
     :return: 板块列表
     :rtype: BlockList)")
 
-      .def("get_trading_calendar", &StockManager::getTradingCalendar, py::arg("query"),
-           py::arg("market") = "SH",
+      .def("get_trading_calendar",
+           py::overload_cast<const KQuery&, const string&>(&StockManager::getTradingCalendar),
+           py::arg("query"), py::arg("market") = "SH",
            R"(get_trading_calendar(self, query[, market='SH'])
 
     获取指定市场的交易日日历
 
     :param KQuery query: Query查询条件
     :param str market: 市场简称
+    :return: 日期列表
+    :rtype: DatetimeList)")
+
+      .def("get_trading_calendar",
+           py::overload_cast<const StockList&, const KQuery&>(&StockManager::getTradingCalendar),
+           py::arg("stk_list"), py::arg("query"),
+           R"(get_trading_calendar(self, stk_list, query)
+
+    根据指定的证券列表获取叠加后的交易日历（主要用于包含不同市场证券时）
+
+    :param StockList stk_list: 股票列表
+    :param KQuery query: Query查询条件
     :return: 日期列表
     :rtype: DatetimeList)")
 
@@ -354,8 +367,6 @@ void export_StockManager(py::module& m) {
     从 sm 中移除 market_code 代表的证券，谨慎使用！！！通常用于移除临时增加的外部 Stock
     
     :param str market_code: 证券市场标识)")
-
-      .def("save_indicator", &StockManager::saveIndicator)
 
       .def("__len__", &StockManager::size, "返回证券数量")
       .def("__getitem__", &StockManager::getStock, "同 get_stock")
