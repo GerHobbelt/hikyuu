@@ -371,14 +371,22 @@ def import_one_stock_data(
                     hku_error(
                         f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord close: {last_krecord[4]}, bar: {bar['close']}")
                     return (0, False, Datetime(last_datetime))
-                if ktype == 'DAY' and last_krecord[5] != 0.0 and abs(last_krecord[5] - bar["amount"]*0.001) > 10000:
-                    hku_error(
-                        f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord amount: {last_krecord[5]}, bar: {bar['amount']*0.001}")
-                    return (0, False, Datetime(last_datetime))
-                if ktype == 'DAY' and last_krecord[6] != 0.0 and abs(last_krecord[6] - bar["vol"]) > 10000:
-                    hku_error(
-                        f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord count: {last_krecord[6]}, bar: {bar['vol']}")
-                    return (0, False, Datetime(last_datetime))
+                if ktype == 'DAY' and last_krecord[5] != 0.0:
+                    # 成交额检查：根据数值大小分档次进行相对百分比比较
+                    amount_diff_ratio = abs(last_krecord[5] - bar["amount"]*0.001) / last_krecord[5]
+                    amount_threshold = 0.5 if last_krecord[5] >= 1e8 else (0.8 if last_krecord[5] >= 1e6 else 1.0)
+                    if amount_diff_ratio > amount_threshold:
+                        hku_error(
+                            f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord amount: {last_krecord[5]}, bar: {bar['amount']*0.001}, diff_ratio: {amount_diff_ratio:.4f}")
+                        return (0, False, Datetime(last_datetime))
+                if ktype == 'DAY' and last_krecord[6] != 0.0:
+                    # 成交量检查：根据数值大小分档次进行相对百分比比较
+                    vol_diff_ratio = abs(last_krecord[6] - bar["vol"]) / last_krecord[6]
+                    vol_threshold = 0.5 if last_krecord[6] >= 1e7 else (0.8 if last_krecord[6] >= 1e5 else 1.0)
+                    if vol_diff_ratio > vol_threshold:
+                        hku_error(
+                            f"fetch data from tdx error! {bar_datetime} {ktype} {market}{code} last_krecord count: {last_krecord[6]}, bar: {bar['vol']}, diff_ratio: {vol_diff_ratio:.4f}")
+                        return (0, False, Datetime(last_datetime))
                 continue
 
             if (
@@ -388,6 +396,12 @@ def import_one_stock_data(
                 and bar["vol"] >= 0
                 and bar["amount"] >= 0
             ):
+                if ktype == "DAY":
+                    if bar["amount"] == 0:
+                        continue
+                else:
+                    if bar["amount"] == 0 or round(bar['vol']) == 0:
+                        continue
                 try:
                     buf.append(
                         (
@@ -611,6 +625,9 @@ def import_on_stock_trans(connect, api, market, stock_record, max_days):
     date_list.reverse()
 
     trans_buf = []
+    # 用于去重的集合，记录已处理的 datetime
+    seen_datetimes = set()
+
     for cur_date in date_list:
         buf = pytdx_get_day_trans(api, pytdx_market, stock_record[2], cur_date)
         if not buf:
@@ -631,14 +648,21 @@ def import_on_stock_trans(connect, api, market, stock_record, max_days):
                     continue
 
                 if record['price'] > 0.0 and record['vol'] >= 0.0:
-                    trans_buf.append(
-                        (
-                            cur_date * 1000000 + minute * 100 + second,
-                            record["price"],
-                            record["vol"],
-                            record["buyorsell"],
+                    # 构建完整的 datetime 值作为去重键值
+                    bar_datetime = cur_date * 1000000 + minute * 100 + second
+
+                    # 检查是否重复
+                    if bar_datetime not in seen_datetimes:
+                        trans_buf.append(
+                            (
+                                bar_datetime,
+                                record["price"],
+                                record["vol"],
+                                record["buyorsell"],
+                            )
                         )
-                    )
+                        # 标记为已处理
+                        seen_datetimes.add(bar_datetime)
             except Exception as e:
                 hku_error("Failed trans to record! {}", e)
 
@@ -747,10 +771,13 @@ def import_on_stock_time(connect, api, market, stock_record, max_days):
     date_list.reverse()
 
     time_buf = []
+    # 用于去重的集合，记录已处理的 datetime
+    seen_datetimes = set()
+
     for cur_date in date_list:
         buf = api.get_history_minute_time_data(pytdx_market, stock_record[2], cur_date)
         if buf is None or len(buf) != 240:
-            # print(cur_date, "获取的分时线长度不为240!", stock_record[1], stock_record[2])
+            # print(cur_date, "获取的分时线长度不为 240!", stock_record[1], stock_record[2])
             continue
         this_date = cur_date * 10000
         time = 930
@@ -765,7 +792,14 @@ def import_on_stock_time(connect, api, market, stock_record, max_days):
                 time = 1400
             try:
                 if record['price'] > 0.0 and record['vol'] >= 0.0:
-                    time_buf.append((this_date + time, record['price'], record['vol']))
+                    # 构建完整的 datetime 值作为去重键值
+                    bar_datetime = this_date + time
+
+                    # 检查是否重复
+                    if bar_datetime not in seen_datetimes:
+                        time_buf.append((bar_datetime, record['price'], record['vol']))
+                        # 标记为已处理
+                        seen_datetimes.add(bar_datetime)
                 time += 1
             except Exception as e:
                 hku_error("Failed trans record {}! {}".format(record, e))
