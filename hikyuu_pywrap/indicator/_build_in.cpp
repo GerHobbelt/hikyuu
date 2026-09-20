@@ -496,6 +496,9 @@ Indicator (*SLOPE3)(const Indicator&, int) = SLOPE;
 Indicator (*SLOPE4)(const Indicator&, const IndParam&) = SLOPE;
 Indicator (*SLOPE5)(const Indicator&, const Indicator&) = SLOPE;
 
+Indicator (*FITR2_1)(int) = FITR2;
+Indicator (*FITR2_2)(const Indicator&, int) = FITR2;
+
 Indicator (*ZHBOND10_1)(double) = ZHBOND10;
 Indicator (*ZHBOND10_2)(const DatetimeList&, double) = ZHBOND10;
 Indicator (*ZHBOND10_3)(const KData& k, double) = ZHBOND10;
@@ -504,11 +507,26 @@ Indicator (*ZHBOND10_4)(const Indicator&, double) = ZHBOND10;
 Indicator (*CORR_1)(const Indicator&, int, bool) = CORR;
 Indicator (*CORR_2)(const Indicator&, const Indicator&, int, bool) = CORR;
 
+Indicator (*COV_1)(const Indicator&, int, bool) = COV;
+Indicator (*COV_2)(const Indicator&, const Indicator&, int, bool) = COV;
+
 Indicator (*BETA_1)(const Indicator&, int, bool) = BETA;
 Indicator (*BETA_2)(const Indicator&, const Indicator&, int, bool) = BETA;
 
 Indicator (*SPEARMAN_1)(const Indicator&, int, bool) = SPEARMAN;
 Indicator (*SPEARMAN_2)(const Indicator&, const Indicator&, int, bool) = SPEARMAN;
+
+Indicator (*SKEW_1)(int) = SKEW;
+Indicator (*SKEW_2)(const IndParam&) = SKEW;
+Indicator (*SKEW_3)(const Indicator&, int) = SKEW;
+Indicator (*SKEW_4)(const Indicator&, const IndParam&) = SKEW;
+Indicator (*SKEW_5)(const Indicator&, const Indicator&) = SKEW;
+
+Indicator (*KURT_1)(int) = KURT;
+Indicator (*KURT_2)(const IndParam&) = KURT;
+Indicator (*KURT_3)(const Indicator&, int) = KURT;
+Indicator (*KURT_4)(const Indicator&, const IndParam&) = KURT;
+Indicator (*KURT_5)(const Indicator&, const Indicator&) = KURT;
 
 Indicator (*ZSCORE_1)(bool, double, bool) = ZSCORE;
 Indicator (*ZSCORE_2)(const Indicator&, bool, double, bool) = ZSCORE;
@@ -1054,6 +1072,20 @@ void export_Indicator_build_in(py::module& m) {
     :param Indicator ind: 指标1
     :param Indicator ref_ind: 指标2
     :param int n: 按指定 n 的长度计算两个 ind 直接数据相关系数。如果为0，使用输入的ind长度。
+    :param bool fill_null: 日期对齐时缺失日期填充nan值
+    :rtype: Indicator)");
+
+    m.def("COV", COV_1, py::arg("ref_ind"), py::arg("n") = 10, py::arg("fill_null") = true);
+    m.def("COV", COV_2, py::arg("ind"), py::arg("ref_ind"), py::arg("n") = 10,
+          py::arg("fill_null") = true,
+          R"(COV(ind, ref_ind[, n=10, fill_null=True])
+
+    计算 ind 和 ref_ind 的样本协方差。
+    与 COV(ref_ind, n)(ind) 等效。
+
+    :param Indicator ind: 指标1
+    :param Indicator ref_ind: 指标2
+    :param int n: 按指定 n 的长度计算两个 ind 直接数据协方差。如果为0，使用输入的ind长度。
     :param bool fill_null: 日期对齐时缺失日期填充nan值
     :rtype: Indicator)");
 
@@ -2148,6 +2180,15 @@ void export_Indicator_build_in(py::module& m) {
     :param int|Indicator|IndParam n: 时间窗口
     :rtype: Indicator)");
 
+    m.def("FITR2", FITR2_1, py::arg("n") = 22);
+    m.def("FITR2", FITR2_2, py::arg("data"), py::arg("n") = 22, R"(FITR2([data, n=22])
+
+    计算线性回归拟合优度R²
+
+    :param Indicator data: 输入数据
+    :param int n: 时间窗口，需 >= 2
+    :rtype: Indicator)");
+
     m.def("MDD", py::overload_cast<int>(&MDD), py::arg("n") = 0);
     m.def("MDD", py::overload_cast<const Indicator&, int>(&MDD), py::arg("data"), py::arg("n") = 0,
           R"(MDD([data, n=0])
@@ -2191,6 +2232,30 @@ void export_Indicator_build_in(py::module& m) {
     :param Indicator ref_ind: 输入参数2
     :param int n: 滚动窗口(大于2 或 等于0)，等于0时，代表 n 实际使用 ind 的长度
     :param bool fill_null: 缺失数据使用 nan 填充; 否则使用小于对应日期且最接近对应日期的数据)");
+
+    m.def("SKEW", SKEW_1, py::arg("n") = 10);
+    m.def("SKEW", SKEW_2, py::arg("n"));
+    m.def("SKEW", SKEW_4, py::arg("data"), py::arg("n"));
+    m.def("SKEW", SKEW_5, py::arg("data"), py::arg("n"));
+    m.def("SKEW", SKEW_3, py::arg("data"), py::arg("n") = 10, R"(SKEW([data, n=10])
+
+    计算N周期内未调整的总体偏度
+
+    :param Indicator data: 输入数据
+    :param int n: N日时间窗口（大于等于3或等于0），等于0时使用输入的data实际长度
+    :rtype: Indicator)");
+
+    m.def("KURT", KURT_1, py::arg("n") = 10);
+    m.def("KURT", KURT_2, py::arg("n"));
+    m.def("KURT", KURT_4, py::arg("data"), py::arg("n"));
+    m.def("KURT", KURT_5, py::arg("data"), py::arg("n"));
+    m.def("KURT", KURT_3, py::arg("data"), py::arg("n") = 10, R"(KURT([data, n=10])
+
+    计算N周期内的超额峰度（未调整的总体峰度 - 3）
+
+    :param Indicator data: 输入数据
+    :param int n: N日时间窗口（大于等于4或等于0），等于0时使用输入的data实际长度
+    :rtype: Indicator)");
 
     // IR(const Indicator& p, const Indicator& b, int n = 100)
     m.def("IR", IR, py::arg("p"), py::arg("b"), py::arg("n") = 100, R"(IR(p, b[, n])
@@ -2692,13 +2757,16 @@ void export_Indicator_build_in(py::module& m) {
     :param KData kdata: K线数据
     :rtype: Indicator)");
 
-    m.def("FACTOR", &FACTOR, py::arg("factor"), R"(FACTOR(factor)
+    m.def("FACTOR", py::overload_cast<const string&>(FACTOR), py::arg("factor"));
+    m.def("FACTOR", py::overload_cast<const Factor&>(&FACTOR), py::arg("factor"), R"(FACTOR(factor)
+    FACTOR(name)
 
     因子指标转换
 
     将Factor对象转换为Indicator，使其可以在指标系统中使用。
     该指标需要设置K线上下文才能进行计算。
 
-    :param Factor factor: 因子对象
+    :param Factor factor: 因子对象（与name二选一）
+    :param str name: 因子名称（便捷版本，与factor二选一）
     :rtype: Indicator)");
 }

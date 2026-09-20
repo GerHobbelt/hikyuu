@@ -569,6 +569,16 @@
     :param int n: 按指定 n 的长度计算两个 ind 直接数据相关系数。如果为0，使用输入的ind长度。
     :rtype: Indicator    
 
+.. py:function:: COV(ind1, ind2[, n=10, fill_null=True])
+
+    计算 ind1 和 ind2 的样本协方差。
+
+    :param Indicator ind1: 指标1
+    :param Indicator ind2: 指标2
+    :param int n: 滚动窗口大小（大于2或等于0），默认10。如果为0，使用输入的ind长度。
+    :param bool fill_null: 日期对齐时，缺失日期是否填充nan值，默认true
+    :rtype: Indicator
+
 
 .. py:function:: COS([data])
 
@@ -787,11 +797,12 @@
     将Factor对象转换为Indicator，使其可以在指标系统中使用。
     该指标需要设置K线上下文才能进行计算。
 
-    :param Factor factor: 因子对象
+    :param Factor factor: 因子对象（与name二选一）
+    :param str name: 因子名称（便捷版本，与factor二选一）
     :rtype: Indicator
 
 
-.. py:function:: FIXED_START_INDEX([ind, start_index=0, factor_name=''])
+.. py:function:: FIXED_START_INDEX([ind, start_index=0])
 
     固定指标计算时使用的查询范围的起始索引
 
@@ -799,11 +810,10 @@
 
     :param Indicator ind: 输入指标
     :param int start_index: 起始索引位置，默认为 0；为负数时，表示从当前最新的往前移 index 个时间点开始计算
-    :param str factor_name: 因子名称（如不为空时，优先使用该因子值）
     :rtype: Indicator
 
 
-.. py:function:: FIXED_START_DATE([ind, start_date=Datetime.min(), factor_name=''])
+.. py:function:: FIXED_START_DATE([ind, start_date=Datetime.min()])
 
     固定指标计算时使用的查询范围的起始日期
 
@@ -811,7 +821,6 @@
 
     :param Indicator ind: 输入指标
     :param Datetime start_date: 起始日期，默认为 Datetime.min()
-    :param str factor_name: 因子名称（如不为空时，优先使用该因子值）
     :rtype: Indicator
 
 
@@ -1689,6 +1698,20 @@
     :rtype: Indicator
 
 
+.. py:function:: FITR2(data, n=22)
+
+    计算线性回归拟合优度R²和斜率
+
+    :param Indicator|sequence data: 输入数据
+    :param int n: 时间窗口，需 >= 2
+    :rtype: Indicator
+    
+    **结果集**：
+    
+    * 结果集0：R² 值（拟合优度）
+    * 结果集1：斜率（SLOPE）
+
+
 .. py:function:: SMA([data, n=22, m=2])
 
     求移动平均
@@ -1708,6 +1731,28 @@
     :param Indicator ind1: 输入参数1
     :param Indicator ind2: 输入参数2
     :param int n: 滚动窗口(大于2 或 等于0)，等于0时，代表 n 实际使用 ind 的长度
+
+
+.. py:function:: SKEW([data, n=10])
+
+    计算N周期内未调整的总体偏度
+
+    :param Indicator data: 输入数据
+    :param int n: N日时间窗口（大于等于3或等于0），等于0时使用输入的data实际长度
+    :rtype: Indicator
+
+
+.. py:function:: KURT([data, n=10])
+
+    计算N周期内的超额峰度（未调整的总体峰度 - 3）
+
+    超额峰度（Excess Kurtosis）是衡量数据分布峰态的指标，用于描述数据分布的尾部厚度。
+    正态分布的超额峰度为0。正的超额峰度表示分布比正态分布有更厚的尾部（尖峰厚尾），
+    负的超额峰度表示分布比正态分布有更薄的尾部（平峰薄尾）。
+
+    :param Indicator data: 输入数据
+    :param int n: N日时间窗口（大于等于4或等于0），等于0时使用输入的data实际长度
+    :rtype: Indicator
 
 
 .. py:function:: SQRT([data])

@@ -122,6 +122,7 @@
 * :py:func:`SIN` - 正弦值
 * :py:func:`SGN` - 求符号值
 * :py:func:`SLOPE` - 计算线性回归斜率
+* :py:func:`FITR2` - 计算线性回归拟合优度R²
 * :py:func:`SQRT` - 开平方
 * :py:func:`TAN` - 正切值
 
@@ -136,7 +137,10 @@
 * :py:func:`VAR` - 估算样本方差
 * :py:func:`VARP` - 总体样本方差
 * :py:func:`CORR` - 样本相关系数与协方差
+* :py:func:`COV` - 样本协方差
 * :py:func:`SPEARMAN` - Spearman相关系数
+* :py:func:`SKEW` - 总体偏度
+* :py:func:`KURT` - 超额峰度
 
 **横向统计**
 
