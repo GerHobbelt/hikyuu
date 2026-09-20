@@ -6,13 +6,11 @@
  */
 
 #include "doctest/doctest.h"
-#include "hikyuu/utilities/config.h"
-
-#if HKU_ENABLE_NODE
 
 #include <string>
 #include <vector>
 #include "hikyuu/data_driver/ipc/ShmClientHook.h"
+#include "../plugin_valid.h"
 
 using namespace hku;
 using namespace hku::ipc;
@@ -75,6 +73,8 @@ ShmClientForwarders makeForwarders(ForwardRecorder& rec) {
 
 /** @par 检测点 */
 TEST_CASE("test_ShmClientHook_forward") {
+    HKU_IF_RETURN(!pluginValid(), void());
+
     ForwardRecorder rec;
     auto fwd = makeForwarders(rec);
 
@@ -127,6 +127,8 @@ TEST_CASE("test_ShmClientHook_forward") {
 
 /** @par 检测点 */
 TEST_CASE("test_ShmClientHook_interrupt") {
+    HKU_IF_RETURN(!pluginValid(), void());
+
     /** @arg 未注册检查器时返回 false */
     setInterruptChecker(nullptr);
     CHECK_UNARY(!checkInterrupted());
@@ -143,5 +145,3 @@ TEST_CASE("test_ShmClientHook_interrupt") {
 }
 
 /** @} */
-
-#endif  // HKU_ENABLE_NODE
