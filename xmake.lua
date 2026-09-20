@@ -6,7 +6,7 @@ set_project("hikyuu")
 add_rules("mode.debug", "mode.release", "mode.coverage")
 
 -- version
-set_version("2.7.7", {build = "%Y%m%d%H%M"})
+set_version("2.7.8", {build = "%Y%m%d%H%M"})
 
 set_warnings("all")
 
@@ -114,7 +114,6 @@ set_configvar("HKU_CLOSE_SPEND_TIME", get_config("spend_time") and 0 or 1)
 set_configvar("HKU_USE_SPDLOG_ASYNC_LOGGER", get_config("async_log") and 1 or 0)
 set_configvar("HKU_LOG_ACTIVE_LEVEL", log_level)
 set_configvar("HKU_ENABLE_HTTP_CLIENT", 1)
-set_configvar("HKU_ENABLE_AISO_HTTP_CLIENT", 1)
 set_configvar("HKU_ENABLE_HTTP_CLIENT_SSL", get_config("http_client_ssl") and 1 or 0)
 set_configvar("HKU_ENABLE_HTTP_CLIENT_ZIP", get_config("http_client_zip") and 1 or 0)
 set_configvar("HKU_ENABLE_NODE", 1)
@@ -212,6 +211,10 @@ end
 
 if has_config("http_client_zip") then
     add_requires("gzip-hpp", {system = false})
+end
+
+if has_config("http_client_ssl") then
+    add_requires("openssl3")
 end
 
 if has_config("ta_lib") then

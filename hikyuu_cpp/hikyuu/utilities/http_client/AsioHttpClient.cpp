@@ -58,6 +58,20 @@ AsioHttpResponse& AsioHttpResponse::operator=(AsioHttpResponse&& rhs) noexcept {
     return *this;
 }
 
+json AsioHttpResponse::json() const {
+    auto content_type = getHeader("Content-Type");
+    if (content_type.find("application/json") != std::string::npos) {
+        return json::parse(m_body);
+    }
+    if (content_type.find("application/msgpack") != std::string::npos) {
+        return json::from_msgpack(m_body);
+    }
+    if (content_type.find("application/cbor") != std::string::npos) {
+        return json::from_cbor(m_body);
+    }
+    return json::parse(m_body);
+}
+
 AsioHttpStreamResponse::AsioHttpStreamResponse(AsioHttpStreamResponse&& rhs)
 : m_status(rhs.m_status),
   m_reason(std::move(rhs.m_reason)),
@@ -189,8 +203,8 @@ AsioHttpClient::AsioHttpClient(int32_t thread_count, size_t max_concurrency)
 #endif
 
     // 初始化连接池
-    m_connection_pool =
-      std::make_unique<ResourceAsioVersionPool<HttpConnection>>(Parameter(), max_concurrency);
+    m_connection_pool = std::make_unique<ResourceAsioVersionPool<HttpConnection, std::mutex>>(
+      Parameter(), max_concurrency);
 
     // 使用内部 io_context，启动工作线程池运行事件循环
     m_worker_threads.reserve(thread_count);
@@ -216,9 +230,9 @@ AsioHttpClient::AsioHttpClient(const std::string& url, int32_t timeout, int32_t 
         m_work_guard = std::make_unique<net::executor_work_guard<net::io_context::executor_type>>(
           m_own_ctx->get_executor());
 
-        // 初始化连接池参数
-        m_connection_pool =
-          std::make_unique<ResourceAsioVersionPool<HttpConnection>>(Parameter(), max_concurrency);
+        // 初始化连接池参数（AsioHttpClient 可能使用多线程，统一使用 std::mutex 保证安全）
+        m_connection_pool = std::make_unique<ResourceAsioVersionPool<HttpConnection, std::mutex>>(
+          Parameter(), max_concurrency);
 
         // 启动后台线程池运行 io_context
         m_worker_threads.reserve(thread_count);
@@ -241,9 +255,9 @@ AsioHttpClient::AsioHttpClient(net::io_context& ctx, const std::string& url, int
         m_ssl_ctx = std::make_unique<SslContext>();
 #endif
 
-        // 初始化连接池参数
-        m_connection_pool =
-          std::make_unique<ResourceAsioVersionPool<HttpConnection>>(Parameter(), max_concurrency);
+        // 初始化连接池参数（使用外部 io_context，由调用方保证线程安全，这里保守使用 std::mutex）
+        m_connection_pool = std::make_unique<ResourceAsioVersionPool<HttpConnection, std::mutex>>(
+          Parameter(), max_concurrency);
     }
 }
 
@@ -443,15 +457,31 @@ std::string AsioHttpClient::_buildURI(const std::string& path, const HttpParams&
 
 // 异步 DNS 解析方法
 net::awaitable<std::vector<tcp::endpoint>> AsioHttpClient::_resolveDNS() {
+    // 先判断host是否为IP地址，是的话直接构造endpoint返回，避免不必要的DNS查询
+    boost::system::error_code ec;
+    auto addr = net::ip::make_address(m_host, ec);
+    if (!ec) {
+        // host是有效的IP地址，直接构造endpoint
+        std::vector<tcp::endpoint> endpoints;
+        uint16_t port_num = static_cast<uint16_t>(std::stoi(m_port));
+        if (addr.is_v4()) {
+            endpoints.emplace_back(tcp::endpoint(addr.to_v4(), port_num));
+        } else if (addr.is_v6()) {
+            endpoints.emplace_back(tcp::endpoint(addr.to_v6(), port_num));
+        }
+        co_return endpoints;
+    }
+
 #if HKU_OS_OSX || HKU_OS_IOS
     // macOS 使用原生 getaddrinfo 方式（beast 解析存在已知问题会卡死）
     struct addrinfo hints, *res = nullptr;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_ADDRCONFIG;  // 只查本机支持的地址类型
 
     int ret = getaddrinfo(m_host.c_str(), m_port.c_str(), &hints, &res);
-    HKU_CHECK(ret == 0, "DNS resolve failed!");
+    HKU_CHECK(ret == 0, "DNS resolve failed! {}:{}", m_host, m_port);
 
     std::vector<tcp::endpoint> dns_endpoints;
     for (struct addrinfo* ai = res; ai != nullptr; ai = ai->ai_next) {
@@ -471,11 +501,7 @@ net::awaitable<std::vector<tcp::endpoint>> AsioHttpClient::_resolveDNS() {
     }
 
     freeaddrinfo(res);
-
-    if (dns_endpoints.empty()) {
-        HKU_THROW("No valid endpoints from DNS resolve");
-    }
-
+    HKU_CHECK(!dns_endpoints.empty(), "DNS resolve failed! {}:{}", m_host, m_port);
     co_return dns_endpoints;
 
 #else
@@ -615,7 +641,7 @@ net::awaitable<std::pair<std::shared_ptr<HttpConnection>, bool>> AsioHttpClient:
 
                 // 启动定时器和连接操作
                 timer.async_wait(
-                  [&timer, &connect_completed, &conn_ptr](const boost::system::error_code& ec) {
+                  [&connect_completed, &conn_ptr](const boost::system::error_code& ec) {
                       if (!ec && !connect_completed && conn_ptr->ssl_socket.has_value()) {
                           conn_ptr->ssl_socket->lowest_layer().cancel();
                       }
@@ -675,7 +701,7 @@ net::awaitable<std::pair<std::shared_ptr<HttpConnection>, bool>> AsioHttpClient:
 
                 // 启动定时器和握手操作
                 timer.async_wait(
-                  [&timer, &handshake_completed, &conn_ptr](const boost::system::error_code& ec) {
+                  [&handshake_completed, &conn_ptr](const boost::system::error_code& ec) {
                       if (!ec && !handshake_completed && conn_ptr->ssl_socket.has_value()) {
                           conn_ptr->ssl_socket->lowest_layer().cancel();
                       }
@@ -683,7 +709,7 @@ net::awaitable<std::pair<std::shared_ptr<HttpConnection>, bool>> AsioHttpClient:
 
                 SslHandshakeOp handshake_op{&conn_ptr->ssl_socket.value(), handshake_completed,
                                             captured_ec};
-                auto handshake_result = co_await handshake_op.run();
+                co_await handshake_op.run();
 
                 // 取消定时器
                 timer.cancel();
@@ -950,14 +976,14 @@ net::awaitable<void> AsioHttpClient::_connect(SocketVariant& socket_variant,
 
         // 启动定时器和握手操作
         timer.async_wait(
-          [&timer, &handshake_completed, &socket_variant](const boost::system::error_code& ec) {
+          [&handshake_completed, &socket_variant](const boost::system::error_code& ec) {
               if (!ec && !handshake_completed && socket_variant.ssl.has_value()) {
                   socket_variant.ssl->lowest_layer().cancel();
               }
           });
 
         SslHandshakeOp handshake_op{&socket_variant.ssl.value(), handshake_completed, captured_ec};
-        auto handshake_result = co_await handshake_op.run();
+        co_await handshake_op.run();
 
         // 取消定时器
         timer.cancel();
@@ -1068,12 +1094,11 @@ net::awaitable<AsioHttpResponse> AsioHttpClient::async_request(
                 };
 
                 // 启动定时器和写操作
-                timer.async_wait(
-                  [&timer, &write_completed, &conn](const boost::system::error_code& ec) {
-                      if (!ec && !write_completed && conn->is_open()) {
-                          conn->lowest_layer().cancel();
-                      }
-                  });
+                timer.async_wait([&write_completed, &conn](const boost::system::error_code& ec) {
+                    if (!ec && !write_completed && conn->is_open()) {
+                        conn->lowest_layer().cancel();
+                    }
+                });
 
                 auto write_op = WriteOp{*conn->ssl_socket, req, write_completed};
                 auto [write_ec, bytes_transferred] = co_await write_op.run();
@@ -1160,12 +1185,11 @@ net::awaitable<AsioHttpResponse> AsioHttpClient::async_request(
                 };
 
                 // 启动定时器和读操作
-                timer.async_wait(
-                  [&timer, &read_completed, &conn](const boost::system::error_code& ec) {
-                      if (!ec && !read_completed && conn->is_open()) {
-                          conn->lowest_layer().cancel();
-                      }
-                  });
+                timer.async_wait([&read_completed, &conn](const boost::system::error_code& ec) {
+                    if (!ec && !read_completed && conn->is_open()) {
+                        conn->lowest_layer().cancel();
+                    }
+                });
 
                 auto read_op = ReadOp{*conn->ssl_socket, buffer, res, read_completed, captured_ec};
                 co_await read_op.run();
@@ -1249,10 +1273,10 @@ net::awaitable<AsioHttpResponse> AsioHttpClient::async_request(
         // 不关闭连接，让连接池自动管理
 
     } catch (const boost::system::system_error& e) {
-        HKU_ERROR("HTTP request system error! {}", e.what());
+        HKU_DEBUG("HTTP request system error! {}", e.what());
         throw;
     } catch (const std::exception& e) {
-        HKU_ERROR("HTTP request failed! {}", e.what());
+        HKU_DEBUG("HTTP request failed! {}", e.what());
         throw;
     }
 
@@ -1561,10 +1585,10 @@ net::awaitable<AsioHttpStreamResponse> AsioHttpClient::async_requestStream(
         // 不关闭连接，让连接池自动管理（连接会被归还到池中）
 
     } catch (const boost::system::system_error& e) {
-        HKU_ERROR("HTTP stream request system error! {}", e.what());
+        HKU_DEBUG("HTTP stream request system error! {}", e.what());
         throw;
     } catch (const std::exception& e) {
-        HKU_ERROR("HTTP stream request failed! {}", e.what());
+        HKU_DEBUG("HTTP stream request failed! {}", e.what());
         throw;
     }
 
@@ -1579,15 +1603,31 @@ AsioHttpResponse AsioHttpClient::request(const std::string& method, const std::s
                                          const HttpParams& params, const HttpHeaders& headers,
                                          const char* body, size_t body_len,
                                          const std::string& content_type) {
+    // 提前验证 URL，避免进入异步协程后才发现问题
+    HKU_CHECK(m_is_valid_url, "Invalid url: {}", m_url);
     HKU_ASSERT(m_ctx);
+
+    // 确保 io_context 处于运行状态
     if (m_ctx->stopped()) {
         m_ctx->restart();
     }
 
+    // 使用 use_future 将协程结果转换为 std::future
     auto future =
       co_spawn(*m_ctx, async_request(method, path, params, headers, body, body_len, content_type),
-               boost::asio::use_future);  // 使用use_future代替detached以更好地管理future
+               boost::asio::use_future);
 
+    // 带超时保护的等待，防止因 URL 非法或其他原因导致的永久阻塞
+    // 超时时间设置为当前超时时间的 1.5 倍，给异步操作留出足够时间
+    auto timeout_duration = m_timeout * 3 / 2;
+    if (future.wait_for(timeout_duration) == std::future_status::timeout) {
+        HKU_THROW_EXCEPTION(
+          HttpTimeoutException,
+          "HTTP request timed out after {} ms (possibly due to invalid URL or network issues)",
+          std::chrono::duration_cast<std::chrono::milliseconds>(timeout_duration).count());
+    }
+
+    // 获取结果，如果协程中抛出了异常，这里会重新抛出
     return future.get();
 }
 
@@ -1595,17 +1635,33 @@ AsioHttpStreamResponse AsioHttpClient::requestStream(
   const std::string& method, const std::string& path, const HttpParams& params,
   const HttpHeaders& headers, const char* body, size_t body_len, const std::string& content_type,
   const HttpChunkCallback& chunk_callback) {
+    // 提前验证 URL 和回调函数
+    HKU_CHECK(m_is_valid_url, "Invalid url: {}", m_url);
+    HKU_CHECK(chunk_callback != nullptr, "Chunk callback must not be null");
     HKU_ASSERT(m_ctx);
+
+    // 确保 io_context 处于运行状态
     if (m_ctx->stopped()) {
         m_ctx->restart();
     }
 
-    auto future =
-      co_spawn(*m_ctx,
-               async_requestStream(method, path, params, headers, body, body_len, content_type,
-                                   chunk_callback),
-               boost::asio::use_future);  // 使用use_future代替detached以更好地管理future
+    // 使用 use_future 将协程结果转换为 std::future
+    auto future = co_spawn(*m_ctx,
+                           async_requestStream(method, path, params, headers, body, body_len,
+                                               content_type, chunk_callback),
+                           boost::asio::use_future);
 
+    // 带超时保护的等待
+    auto timeout_duration = m_timeout * 3 / 2;
+    if (future.wait_for(timeout_duration) == std::future_status::timeout) {
+        HKU_THROW_EXCEPTION(
+          HttpTimeoutException,
+          "HTTP stream request timed out after {} ms (possibly due to invalid URL or network "
+          "issues)",
+          std::chrono::duration_cast<std::chrono::milliseconds>(timeout_duration).count());
+    }
+
+    // 获取结果，如果协程中抛出了异常，这里会重新抛出
     return future.get();
 }
 

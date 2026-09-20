@@ -72,6 +72,15 @@ void IFinance::_increment_calculate(const Indicator& data, size_t start_pos) {
     const auto* k = kdata.data();
 
     size_t finances_total = finances.size();
+
+    // Fixed #25(gitee) 季报和年报在同一天发布可能冲突
+    // 公式FINANCE(kdata, 231) 和FINANCE(kdata,95)中没有年报（231为第四季度）的数据的问题
+    for (size_t i = finances_total - 1; i > 0; --i) {
+        if (finances[i - 1].reportDate >= finances[i].reportDate) {
+            finances[i - 1].reportDate = finances[i].reportDate - TimeDelta(1);
+        }
+    }
+
     size_t cur_kix = start_pos;
     size_t pos = 0;
     while (pos < finances_total && cur_kix < total) {

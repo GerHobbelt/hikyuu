@@ -7,6 +7,7 @@
 **辅助类指标**
 
 * :py:func:`ALIGN` - 按指定的参考日期对齐
+* :py:func:`CODELIKE` - 证券代码模式匹配
 * :py:func:`CYCLE` - PF调仓周期指标，主要用于PF调仓日验证，及作为SG
 * :py:func:`CVAL` - 创建指定长度的固定数值指标
 * :py:func:`CONTEXT` - 独立上下文
@@ -19,6 +20,7 @@
 * :py:func:`JUMPDOWN` - 边缘跳变，从小于等于0.0，跳变到 > 0.0
 * :py:func:`JUMPUP` - 边缘跳变，从大于0.0，跳变到 <= 0.0
 * :py:func:`LASTVALUE` - 等同于通达信 CONST 指标。取输入指标最后值为常数, 即结果中所有值均为输入指标的最后值, 谨慎使用。含未来函数, 谨慎使用。
+* :py:func:`NAMELIKE` - 证券名称模式匹配
 * :py:func:`PRICELIST` - 将PriceList或Indicator的结果集包装为Indicator，同名 VALUE
 * :py:func:`REF` - 向前引用 （即右移），引用若干周期前的数据
 * :py:func:`REFX` - REF增强, 可左移或右移。左移时为未来函数，勿用于回测。
@@ -51,6 +53,7 @@
 * :py:func:`TIMELINEVOL`   - 分时成交量
 * :py:func:`ZHBOND10` - 10年期中国国债收益率
 * :py:func:`ZONGGUBEN` - 总股本
+* :py:func:`STKTYPE` - 股票类型指标
 * :py:func:`ISLIMITUP` - 判断是否涨停
 * :py:func:`ISLIMITDOWN` - 判断是否跌停
     
@@ -139,6 +142,7 @@
 * :py:func:`BACKSET` - 向前赋值将当前位置到若干周期前的数据设为1
 * :py:func:`BARSCOUNT` - 有效值周期数, 求总的周期数。
 * :py:func:`BARSLAST` - 上一次条件成立位置, 上一次条件成立到当前的周期数
+* :py:func:`BARSLASTS` - 第N次条件成立位置到当前的周期数（支持动态参数）
 * :py:func:`BARSLASTCOUNT` - 统计连续满足条件的周期数
 * :py:func:`BARSSINCE` - 第一个条件成立位置到当前的周期数
 * :py:func:`COUNT` - 统计满足条件的周期数

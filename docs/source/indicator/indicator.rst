@@ -233,6 +233,38 @@
     :rtype: Indicator
 
 
+.. py:function:: BARSLASTS([data|val,] n)
+
+    第N次条件成立位置到当前的周期数。
+
+    用法：BARSLASTS(X, N): 第N次 X 不为 0 到现在的天数。
+
+    例如：BARSLASTS(CLOSE/REF(CLOSE,1)>=1.1, 2) 表示第2个涨停板到当前的周期数。
+
+    注意：当N=1时，BARSLASTS(X, 1) 等价于 BARSLAST(X)。
+
+    支持动态参数，n 可以是整数、Indicator 或 IndParam。
+
+    使用示例::
+
+        # 静态参数
+        result = BARSLASTS(cond, 2)
+        
+        # 动态参数 - 使用 CVAL
+        result = BARSLASTS(cond, CVAL(cond, 2))
+        
+        # 动态参数 - 使用 IndParam
+        result = BARSLASTS(cond, IndParam(n_indicator))
+        
+        # 动态参数 - 直接使用 Indicator
+        result = BARSLASTS(cond, n_indicator)
+
+    :param Indicator data: 输入数据（可选）
+    :param float val: 输入值（可选，与data二选一）
+    :param int|Indicator|IndParam n: 第N次条件成立，支持动态参数
+    :rtype: Indicator
+
+
 .. py:function:: BARSLASTCOUNT([data])
 
     统计连续满足条件的周期数
@@ -374,6 +406,38 @@
 
     :param KData k: 关联的K线数据
     :param float x: x%获利价格, 0~100
+    :rtype: Indicator
+
+
+.. py:function:: CODELIKE([data,] pattern)
+
+    证券代码模式匹配
+    
+    返回当前上下文中的证券代码是否匹配指定的模式。支持通配符匹配：
+    
+    - ``*`` ：匹配任意长度的任意字符序列（包括空序列）
+    - ``?`` ：匹配单个任意字符
+    
+    返回值：匹配成功返回 1.0，否则返回 0.0。所有周期的返回值相同。
+    
+    使用示例::
+    
+        # 匹配以"600"开头的股票代码
+        kdata = get_kdata('sh600000', Query(-10))
+        result = CODELIKE(kdata, "600*")
+        
+        # 匹配6位数字的股票代码
+        result = CODELIKE(kdata, "??????")
+        
+        # 匹配以"000"开头且以"1"结尾的代码
+        result = CODELIKE(kdata, "000*1")
+        
+        # 精确匹配特定代码
+        result = CODELIKE(kdata, "600000")
+
+    :param KData data: K线数据（可选，当存在上下文时可省略）
+    :param str pattern: 匹配模式，支持通配符 * 和 ?
+    :return: 匹配结果指标，所有周期值相同（1.0 或 0.0）
     :rtype: Indicator
 
 
@@ -1097,6 +1161,38 @@
     最大盈利百分比(和MDD向对应的相反方向计算)
 
 
+.. py:function:: NAMELIKE([data,] pattern)
+
+    证券名称模式匹配
+    
+    返回当前上下文中的证券名称是否匹配指定的模式。支持通配符匹配：
+    
+    - ``*`` ：匹配任意长度的任意字符序列（包括空序列）
+    - ``?`` ：匹配单个任意字符
+    
+    返回值：匹配成功返回 1.0，否则返回 0.0。所有周期的返回值相同。
+    
+    使用示例::
+    
+        # 匹配以"上证"开头的指数名称
+        kdata = get_kdata('sh000001', Query(-10))
+        result = NAMELIKE(kdata, "上证*")
+        
+        # 匹配包含"指数"的名称
+        result = NAMELIKE(kdata, "*指数*")
+        
+        # 匹配4个字符的名称
+        result = NAMELIKE(kdata, "????")
+        
+        # 精确匹配特定名称
+        result = NAMELIKE(kdata, "上证指数")
+
+    :param KData data: K线数据（可选，当存在上下文时可省略）
+    :param str pattern: 匹配模式，支持通配符 * 和 ?
+    :return: 匹配结果指标，所有周期值相同（1.0 或 0.0）
+    :rtype: Indicator
+
+
 .. py:function:: NDAY(x, y[, n=3])
 
     连大, NDAY(X,Y,N)表示条件X>Y持续存在N个周期
@@ -1419,6 +1515,26 @@
     
     :param data: 输入数据
     :param int|Indicator|IndParam n: 时间窗口
+    :rtype: Indicator
+
+
+.. py:function:: STKTYPE([k])
+
+    获取股票类型指标
+
+    返回当前股票的类型值（StockType枚举值）
+
+    示例::
+
+        # 使用默认上下文
+        stktype = STKTYPE()
+        
+        # 指定K线数据
+        stock = sm.getStock("sh000001")
+        kdata = stock.getKData(Query(0, 100))
+        stktype = STKTYPE(kdata)
+
+    :param KData k: K线数据上下文
     :rtype: Indicator
 
 
