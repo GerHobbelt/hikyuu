@@ -22,9 +22,7 @@ Hikyuu Quant Framework 是一款基于 C++/Python 开发的**开源超高速量�
 
 👉 **帮助文档：**[https://hikyuu.readthedocs.io/zh-cn/latest/index.html](https://hikyuu.readthedocs.io/zh-cn/latest/index.html)
 
-👉 **Wiki文档（AI生成）：**[https://github.com/fasiondog/hikyuu/wiki](https://github.com/fasiondog/hikyuu/wiki)
-
-👉 **入门示例:**  [https://nbviewer.org/github/fasiondog/hikyuu/blob/master/hikyuu/examples/notebook/000-Index.ipynb?flush_cache=True](https://nbviewer.org/github/fasiondog/hikyuu/blob/master/hikyuu/examples/notebook/000-Index.ipynb?flush_cache=True)
+👉 **入门示例:**[https://nbviewer.org/github/fasiondog/hikyuu/blob/master/hikyuu/examples/notebook/000-Index.ipynb?flush_cache=True](https://nbviewer.org/github/fasiondog/hikyuu/blob/master/hikyuu/examples/notebook/000-Index.ipynb?flush_cache=True)
 
 👉 **策略部件库：**[https://gitee.com/fasiondog/hikyuu_hub](https://gitee.com/fasiondog/hikyuu_hub)
 
@@ -90,12 +88,12 @@ Hikyuu 对系统化交易方法进行了轻量化抽象，涵盖市场环境判�
 
 🎁 [**捐赠计划与附赠参见**：https://hikyuu.readthedocs.io/zh-cn/latest/vip/donate-plan.html](https://hikyuu.readthedocs.io/zh-cn/latest/vip/donate-plan.html)
 
-| 说明                                                       | 捐赠链接（与下方二维码同）                                      |
-| ---------------------------------------------------------- | --------------------------------------------------------------- |
-| 请作者喝杯☕️（30元）                                     | [https://pay.ldxp.cn/item/gflv3v](https://pay.ldxp.cn/item/gflv3v) |
-| 订阅180天（50元）                                          | [https://pay.ldxp.cn/item/du4h8s](https://pay.ldxp.cn/item/du4h8s) |
-| 订阅365天（100元）                                         | [https://pay.ldxp.cn/item/ehbz9b](https://pay.ldxp.cn/item/ehbz9b) |
-| 加入星球<br />(3台设备及其他，<br />首年300元， 续费半价） | [https://t.zsxq.com/YSATD](https://t.zsxq.com/YSATD)               |
+| 说明                                                       | 扫码方式               | 捐赠链接（与下方二维码同）                                      |
+| ---------------------------------------------------------- | ---------------------- | --------------------------------------------------------------- |
+| 请作者喝杯☕️（30元）                                     | 支付宝                 | [https://pay.ldxp.cn/item/gflv3v](https://pay.ldxp.cn/item/gflv3v) |
+| 订阅180天（50元）                                          | 支付宝                 | [https://pay.ldxp.cn/item/du4h8s](https://pay.ldxp.cn/item/du4h8s) |
+| 订阅365天（100元）                                         | 支付宝                 | [https://pay.ldxp.cn/item/ehbz9b](https://pay.ldxp.cn/item/ehbz9b) |
+| 加入星球<br />(3台设备及其他，<br />首年300元， 续费半价） | 微信/<br />知识星球app | [https://t.zsxq.com/YSATD](https://t.zsxq.com/YSATD)               |
 
 ![img](docs/source/_static/dingyue.png)
 
