@@ -1,6 +1,7 @@
 
 target("hikyuu")
-    set_kind("$(kind)")
+    -- set_kind("$(kind)")
+    set_kind("shared")
 
     if is_mode("coverage") then 
         add_cxflags("-fprofile-update=atomic")
@@ -18,12 +19,21 @@ target("hikyuu")
         end
     end
 
-    add_packages("boost", "fmt", "spdlog", "flatbuffers", "nng", "nlohmann_json", "xxhash", "eigen")
+    if has_config("http_client_ssl") or has_config("mysql") then
+        add_packages("openssl3")
+    end
+
+    add_packages("boost", "fmt", "spdlog", "tl_expected", "nlohmann_json", "xxhash", "eigen")
+    add_packages("flatbuffers", "nng")
     if is_plat("windows", "linux", "cross", "macosx") then
         if get_config("sqlite") or get_config("hdf5") then
             add_packages("sqlite3")
         end
     end
+
+    if has_config("mysql") and not has_config("disable_libmysqlclient") then
+        add_packages("mysql")
+    end    
 
     if is_plat("windows", "linux", "cross") then 
         add_packages("mimalloc")
@@ -34,10 +44,6 @@ target("hikyuu")
         if is_plat("macosx") then
             add_packages("libomp")
         end
-    end
-
-    if has_config("http_client_ssl") then
-        add_packages("openssl3")
     end
 
     if has_config("http_client_zip") then
@@ -72,9 +78,6 @@ target("hikyuu")
 
     if get_config("hdf5") then
         add_packages("hdf5")
-    end
-    if get_config("mysql") then
-        add_packages("mysql")
     end
 
     if is_plat("windows") then
@@ -165,11 +168,33 @@ target("hikyuu")
         add_files("./data_driver/kdata/tdx/**.cpp", {unity_group="tdx"})
     end
     if get_config("mysql") then
-        add_files("./utilities/db_connect/mysql/**.cpp", {unity_group="mysql"})
+        add_files("./utilities/db_connect/mysql/mysql_imp.cpp")
     end
     if has_config("ta_lib") then
         add_files("./indicator_talib/**.cpp", {unity_group="talib"})
     end
+
+    before_build(function(target)
+        import("lib.detect.find_library")
+        if is_plat("linux") then
+            -- boost.mysql 依赖的 charconv 会自动检测包含__float128
+            local quadmath = find_library("quadmath*",{
+                "/usr/lib",
+                "/usr/lib64",
+                "/usr/local/lib",
+                "/usr/lib/x86_64-linux-gnu",
+                "/usr/lib/aarch64-linux-gnu",
+                "/usr/lib/arm-linux-gnueabihf",
+                "/usr/lib/gcc/x86_64-linux-gnu/**",
+                "/usr/lib/gcc/aarch64-linux-gnu/**",
+                "/usr/lib/gcc/arm-linux-gnueabihf/**"
+            })
+            -- print(quadmath)
+            if quadmath ~= nil then
+                target:add("syslinks", "quadmath")
+            end
+        end
+    end)
 
     after_build(function(target)
         local destpath = get_config("builddir") .. "/" .. get_config("mode") .. "/" .. get_config("plat") .. "/" .. get_config("arch")

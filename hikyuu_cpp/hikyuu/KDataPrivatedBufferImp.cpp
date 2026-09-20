@@ -84,9 +84,8 @@ void KDataPrivatedBufferImp::_recover() {
         return;
 
     // 日线以上复权处理
-    if (m_query.kType() == KQuery::WEEK || m_query.kType() == KQuery::MONTH ||
-        m_query.kType() == KQuery::QUARTER || m_query.kType() == KQuery::HALFYEAR ||
-        m_query.kType() == KQuery::YEAR) {
+    int64_t secs = KQuery::getKTypeInSeconds(m_query.kType());
+    if (secs > KQuery::getKTypeInSeconds(KQuery::DAY)) {
         _recoverForUpDay();
         return;
     }
@@ -161,6 +160,8 @@ void KDataPrivatedBufferImp::_recoverForUpDay() {
                 record.highPrice = day_list[day_pos].highPrice;
             }
             record.closePrice = day_list[day_pos].closePrice;
+            record.transCount += day_list[day_pos].transCount;
+            record.transAmount += day_list[day_pos].transAmount;
             day_pos++;
         }
         if (pre_day_pos != day_pos) {
@@ -168,6 +169,8 @@ void KDataPrivatedBufferImp::_recoverForUpDay() {
             m_buffer[i].highPrice = record.highPrice;
             m_buffer[i].lowPrice = record.lowPrice;
             m_buffer[i].closePrice = record.closePrice;
+            m_buffer[i].transCount = roundEx(record.transCount, 0);
+            m_buffer[i].transAmount = roundEx(record.transAmount, m_stock.precision());
         }
     }
 
