@@ -22,6 +22,10 @@ namespace hku {
 class HKU_API Indicator;
 class HKU_API IndParam;
 
+namespace detail {
+class CompiledFactorPlan;
+}
+
 vector<Indicator> HKU_API combineCalculateIndicators(const vector<Indicator>& indicators,
                                                      const KData& kdata, bool tovalue);
 
@@ -32,6 +36,7 @@ vector<Indicator> HKU_API combineCalculateIndicators(const vector<Indicator>& in
 class HKU_API IndicatorImp : public enable_shared_from_this<IndicatorImp> {
     PARAMETER_SUPPORT_WITH_CHECK
     friend HKU_API std::ostream& operator<<(std::ostream& os, const IndicatorImp& imp);
+    friend class detail::CompiledFactorPlan;
 
     typedef vector<Indicator> IndicatorList;
     friend IndicatorList HKU_API combineCalculateIndicators(const IndicatorList& indicators,
@@ -125,6 +130,21 @@ public:
     /** 返回形如：Name(param1=val,param2=val,...) */
     string long_name() const;
 
+    /**
+     * @brief 构造出身标识（进程内唯一，clone/cloneNode 传承，不序列化）
+     *
+     * 供缓存类设施用作身份（如截面面板缓存）。同一次构造及其克隆链共享同一 id；
+     * 独立构造必然不同 id。不参与 alike()/operator==/formula() 等任何既有判等与展示。
+     *
+     * 注：定义在 IndicatorImp.cpp（非 inline）。dllexport 类的 inline 成员不保证导出，
+     * 是否产生外部符号引用取决于调用方的内联决策，插件 dll 会链接失败。
+     *
+     * 注意（身份语义限制）：origin_id 只标识"出身"，不感知构造后的原地变异
+     * （setParam/setIndParam/add）。凡被缓存设施用作身份的指标对象，构造后必须
+     * 视为不可变；如需不同参数请构造新对象（新对象必持新 id）。
+     */
+    uint64_t originId() const noexcept;
+
     virtual string formula() const;
     virtual string str() const;
 
@@ -145,6 +165,21 @@ public:
     IndicatorImpPtr clone();
 
     bool isPythonObject() const noexcept;
+
+    /**
+     * 该实现是否可在可复用的批处理执行器上被反复重算。
+     *
+     * 默认放行（非 Python 实现、且未显式置 `_support_batch_reuse=false` 都视为可复用）。
+     * 参与复用意味着同一节点的计算图会被 `CompiledFactorPlan` 跨股票反复重绑 context
+     * 并重算，因此自定义 C++ 指标必须满足：除 IndicatorImp 自身的 result buffer 与
+     * `m_params/m_ind_params` 外，不持有任何跨股票会残留的成员状态（如缓存统计量、可变
+     * 缓冲、上次输入依赖的中间结果等）。凡是会在 `_calculate`/`_dyn_calculate` 外部保留
+     * 上述状态、或无法通过 `scrubTemplateNode` 重置干净的实现，都应在构造时调用
+     * `supportBatchReuse(false)` 主动退出快速路径，回退到旧行为。
+     */
+    bool supportBatchReuse() const;
+
+    void supportBatchReuse(bool enable);
 
     /** 仅用于两个结果集数量相同、长度相同的指标交换数据，不交换其他参数。失败抛出异常 */
     void swap(IndicatorImp* other);
@@ -321,6 +356,12 @@ protected:
     ind_param_map_t m_ind_params;  // don't use unordered_map
 
     IndicatorImp* m_parent{nullptr};  // can't use shared_from_this in python, so not weak_ptr
+
+    /** 构造发号器：唯一定义在 IndicatorImp.cpp，保证跨 DLL 只有一份计数器 */
+    static uint64_t nextOriginId() noexcept;
+
+    /** 构造出身标识：构造发放，clone/cloneNode 传承，不进序列化 NVP 列表 */
+    uint64_t m_origin_id{nextOriginId()};
 
 public:
     static void initEngine();
@@ -539,6 +580,15 @@ inline size_t IndicatorImp::_get_step_start(size_t pos, size_t step, size_t disc
 
 inline bool IndicatorImp::isPythonObject() const noexcept {
     return m_is_python_object;
+}
+
+inline bool IndicatorImp::supportBatchReuse() const {
+    static const string param_name("_support_batch_reuse");
+    return !m_is_python_object && (!haveParam(param_name) || getParam<bool>(param_name));
+}
+
+inline void IndicatorImp::supportBatchReuse(bool enable) {
+    m_params.set<bool>("_support_batch_reuse", enable);
 }
 
 inline IndicatorImpPtr IndicatorImp::getRightNode() const noexcept {

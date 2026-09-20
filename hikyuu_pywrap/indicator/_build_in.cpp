@@ -510,6 +510,12 @@ Indicator (*COV_2)(const Indicator&, const Indicator&, int, bool) = COV;
 Indicator (*BETA_1)(const Indicator&, int, bool) = BETA;
 Indicator (*BETA_2)(const Indicator&, const Indicator&, int, bool) = BETA;
 
+Indicator (*RSRS_BETA_1)(int) = RSRS_BETA;
+Indicator (*RSRS_BETA_2)(const KData&, int) = RSRS_BETA;
+
+Indicator (*RSRS_BULL_1)(int, int) = RSRS_BULL;
+Indicator (*RSRS_BULL_2)(const KData&, int, int) = RSRS_BULL;
+
 Indicator (*SPEARMAN_1)(const Indicator&, int, bool) = SPEARMAN;
 Indicator (*SPEARMAN_2)(const Indicator&, const Indicator&, int, bool) = SPEARMAN;
 
@@ -530,6 +536,9 @@ Indicator (*ZSCORE_2)(const Indicator&, bool, double, bool) = ZSCORE;
 
 Indicator (*ADX_1)(int) = ADX;
 Indicator (*ADX_2)(const KData&, int) = ADX;
+
+Indicator (*ADX2_1)(int) = ADX2;
+Indicator (*ADX2_2)(const KData&, int) = ADX2;
 
 void export_Indicator_build_in(py::module& m) {
     m.def("C_KDATA", KDATA1);
@@ -885,6 +894,28 @@ void export_Indicator_build_in(py::module& m) {
     - ADX < 25：无趋势，箱体震荡
     - ADX数值越大，趋势越猛)");
 
+    m.def("ADX2", ADX2_1, py::arg("n") = 14);
+    m.def("ADX2", ADX2_2, py::arg("kdata"), py::arg("n") = 14,
+          R"(ADX2([kdata, n=14])
+
+    平均趋向指数(ADX2) - 使用EMA平滑方式
+
+    ADX2属于趋势强度指标，不分辨涨跌方向，只判断有没有趋势。
+    与ADX的区别在于使用EMA（指数移动平均）而非Wilder平滑，对趋势变化更敏感。
+
+    :param KData kdata: 待计算的源数据
+    :param int n: 计算周期，默认14，必须为大于1的整数
+    :rtype: 具有三个结果集的 Indicator
+
+    * result(0): ADX2本身（趋势强度，值域0~100）
+    * result(1): +DI（上升动向线，多头力量）
+    * result(2): -DI（下降动向线，空头力量）
+
+    判断标准：
+    - ADX2 >= 25：存在清晰单边趋势（上涨/下跌都行）
+    - ADX2 < 25：无趋势，箱体震荡
+    - ADX2数值越大，趋势越猛)");
+
     m.def("MACD", MACD_1, py::arg("n1") = 12, py::arg("n2") = 26, py::arg("n3") = 9);
     m.def("MACD", MACD_2, py::arg("n1"), py::arg("n2"), py::arg("n3"));
     m.def("MACD", MACD_3, py::arg("data"), py::arg("n1") = 12, py::arg("n2") = 26,
@@ -1126,6 +1157,49 @@ void export_Indicator_build_in(py::module& m) {
     :param Indicator ref_ind: 对照指标，如市场收益率指标
     :param int n: 滚动窗口大小（大于2或等于0）。如果为0，使用输入的ind长度。
     :param bool fill_null: 日期对齐时，缺失日期填充nan值
+    :rtype: Indicator)");
+
+    m.def("RSRS_BETA", RSRS_BETA_1, py::arg("n") = 20);
+    m.def("RSRS_BETA", RSRS_BETA_2, py::arg("kdata"), py::arg("n") = 20,
+          R"(RSRS_BETA([kdata, n=20])
+
+    原始 RSRS（底层 β）指标，基于滚动N日OLS回归。
+
+    每根K线贡献一个坐标点 (Low[i], High[i])，使用滚动窗口内的N个点进行OLS回归。
+    公式：High = α + β · Low
+
+    β 为最原始的 RSRS 斜率，代表支撑阻力强弱。
+    缺陷：不同行情区间 β 中枢波动大，不能跨时段直接对比。
+
+    :param KData kdata: K线数据
+    :param int n: 滚动窗口，默认为20
+    :rtype: Indicator)");
+
+    m.def("RSRS_BULL", RSRS_BULL_1, py::arg("n") = 20, py::arg("m") = 60);
+    m.def("RSRS_BULL", RSRS_BULL_2, py::arg("kdata"), py::arg("n") = 20, py::arg("m") = 60,
+          R"(RSRS_BULL([kdata, n=20, m=60])
+
+    RSRS 右偏标准分指标（层级4），基于光大研报进阶版修正 RSRS。
+
+    在修正标准分（Z × R²）基础上再乘一次原始 β，放大多头强势区间的分值、压缩空头弱势分值，专门做多择时用。
+
+    **计算层次**：
+
+    1. **层次1（β）**：滚动 N 日 OLS 回归计算 β 值，公式：High = α + β · Low
+    2. **层次2（Z）**：滚动 M 日 Z-score 标准化，解决不同阶段 β 中枢漂移问题
+    3. **层次3（修正标准分）**：Z × R²，R² 为回归拟合优度，过滤拟合差的噪音
+    4. **层次4（右偏修正）**：Z × R² × β，放大多头强势区间
+
+    **返回结果**：
+
+    * result(0): 层级4修正值（右偏修正 = Z × R² × β）
+    * result(1): β 值（回归斜率）
+    * result(2): R² 值（回归拟合优度）
+    * result(3): Z 值（Z-score 标准化值）
+
+    :param KData kdata: K线数据
+    :param int n: 回归窗口，默认为20
+    :param int m: Z-score窗口，默认为60
     :rtype: Indicator)");
 
     m.def("IF", IF_1);

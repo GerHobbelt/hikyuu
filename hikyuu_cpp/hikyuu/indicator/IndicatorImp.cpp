@@ -6,6 +6,7 @@
  */
 #include <stdexcept>
 #include <algorithm>
+#include <atomic>
 #include <forward_list>
 #include <stack>
 #include "hikyuu/utilities/Log.h"
@@ -145,6 +146,18 @@ HKU_API std::ostream &operator<<(std::ostream &os, const IndicatorImpPtr &imp) {
         os << imp->str();
     }
     return os;
+}
+
+// 构造出身发号器。唯一定义于本文件（非 inline），保证跨 DLL 只有一份计数器：
+// 派生指标可能在插件 dll（如 extind）中构造，但其基类构造函数由核心 dll 导出并执行，
+// in-class 初始器随之在核心侧求值，id 空间统一。
+uint64_t IndicatorImp::nextOriginId() noexcept {
+    static std::atomic<uint64_t> seq{1};
+    return seq.fetch_add(1, std::memory_order_relaxed);
+}
+
+uint64_t IndicatorImp::originId() const noexcept {
+    return m_origin_id;
 }
 
 IndicatorImp::IndicatorImp() : m_name("IndicatorImp") {
@@ -398,6 +411,7 @@ IndicatorImpPtr IndicatorImp::clone() {
     IndicatorImpPtr p = _clone();
     p->m_params = m_params;
     p->m_name = m_name;
+    p->m_origin_id = m_origin_id;  // 出身证复印：克隆链共享构造身份
     p->m_is_python_object = m_is_python_object;
     p->m_need_self_alike_compare = m_need_self_alike_compare;
     p->m_is_serial = m_is_serial;
@@ -927,6 +941,14 @@ Indicator IndicatorImp::calculate() {
                     _calculate(Indicator());
                 }
             } else {
+                // 动态周期叶子没有右子节点驱动 buffer 定长。当执行器跨股票重绑 context 时，
+                // 空输入会让 _dyn_calculate 在 total == 0 处提前返回而完全不触碰 buffer，
+                // 导致上一只股票的数据与长度残留在 buffer 中（脏缓冲区）。这里在调用前按
+                // 当前 context 长度预尺寸并 null 填充 buffer，使得即便 _dyn_calculate 什么都不写，
+                // size()/data() 也能返回正确（可能更短）的长度。
+                if (isNeedContext()) {
+                    _readyBuffer(getContext().size(), m_result_num);
+                }
                 _dyn_calculate(Indicator());
             }
             break;
@@ -1977,15 +1999,18 @@ bool IndicatorImp::alike(const IndicatorImp &other) const {
                     m_ind_params.size() != other.m_ind_params.size() || m_params != other.m_params,
                   false);
 
-    if (needSelfAlikeCompare()) {
-        return selfAlike(other);
-    }
-
     auto iter1 = m_ind_params.cbegin();
-    auto iter2 = other.m_ind_params.cend();
+    auto iter2 = other.m_ind_params.cbegin();
     for (; iter1 != m_ind_params.cend() && iter2 != other.m_ind_params.cend(); ++iter1, ++iter2) {
         HKU_IF_RETURN(iter1->first != iter2->first, false);
         HKU_IF_RETURN(!iter1->second->alike(*(iter2->second)), false);
+    }
+
+    if (needSelfAlikeCompare()) {
+        HKU_IF_RETURN(!selfAlike(other), false);
+        // Special leaves use structural identity so an unevaluated operator template (such as
+        // CVAL(value)) can match a calculated input without comparing runtime buffers.
+        HKU_IF_RETURN(isLeaf(), true);
     }
 
     if (isLeaf() && other.isLeaf()) {
@@ -2001,9 +2026,12 @@ bool IndicatorImp::alike(const IndicatorImp &other) const {
         return eq;
     }
 
-    HKU_IF_RETURN(m_three && other.m_three && !m_three->alike(*other.m_three), false);
-    HKU_IF_RETURN(m_left && other.m_left && !m_left->alike(*other.m_left), false);
-    HKU_IF_RETURN(m_right && other.m_right && !m_right->alike(*other.m_right), false);
+    HKU_IF_RETURN(bool(m_three) != bool(other.m_three) || bool(m_left) != bool(other.m_left) ||
+                    bool(m_right) != bool(other.m_right),
+                  false);
+    HKU_IF_RETURN(m_three && !m_three->alike(*other.m_three), false);
+    HKU_IF_RETURN(m_left && !m_left->alike(*other.m_left), false);
+    HKU_IF_RETURN(m_right && !m_right->alike(*other.m_right), false);
 
     return true;
 }
@@ -2067,45 +2095,42 @@ void IndicatorImp::inner_repeatALikeNodes(vector<IndicatorImpPtr> &sub_nodes) {
     size_t total = sub_nodes.size();
     for (size_t i = 0; i < total; i++) {
         const auto &cur = sub_nodes[i];
-        if (!cur) {
+        // Detached private roots (such as Indicator2InImp::m_ref_ind) have no generic parent
+        // edge and cannot participate in m_left/m_right/m_three replacement.
+        if (!cur || !cur->m_parent) {
             continue;
         }
         for (size_t j = i + 1; j < total; j++) {
             auto &node = sub_nodes[j];
-            if (!node || cur == node) {
+            if (!node || !node->m_parent || cur == node) {
                 continue;
             }
 
             if (cur->alike(*node)) {
                 IndicatorImp *node_parent = node->m_parent;
-                if (node_parent) {
-                    if (node_parent->m_left == node) {
-                        node_parent->m_left = cur;
-                    }
+                if (node_parent->m_left == node) {
+                    node_parent->m_left = cur;
+                }
 
-                    if (node_parent->m_right == node) {
-                        node_parent->m_right = cur;
-                    }
+                if (node_parent->m_right == node) {
+                    node_parent->m_right = cur;
+                }
 
-                    if (node_parent->m_three == node) {
-                        node_parent->m_three = cur;
-                    }
+                if (node_parent->m_three == node) {
+                    node_parent->m_three = cur;
+                }
 
-                    tmp_nodes.clear();
-                    node->getAllSubNodes(tmp_nodes);
-                    for (const auto &replace_node : tmp_nodes) {
-                        for (size_t k = j + 1; k < total; k++) {
-                            if (replace_node == sub_nodes[k]) {
-                                sub_nodes[k].reset();
-                            }
+                tmp_nodes.clear();
+                node->getAllSubNodes(tmp_nodes);
+                for (const auto &replace_node : tmp_nodes) {
+                    for (size_t k = j + 1; k < total; k++) {
+                        if (replace_node == sub_nodes[k]) {
+                            sub_nodes[k].reset();
                         }
                     }
-
-                    node = cur;
-
-                } else {
-                    HKU_WARN("Exist some errors! node: {} cur: {}", node->name(), cur->name());
                 }
+
+                node = cur;
             }
         }
     }

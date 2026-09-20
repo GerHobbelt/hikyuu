@@ -15,6 +15,7 @@
 #include "crt/ACOS.h"
 #include "crt/AD.h"
 #include "crt/ADX.h"
+#include "crt/ADX2.h"
 #include "crt/ADJ_FACTOR.h"
 #include "crt/ADVANCE.h"
 #include "crt/ALIGN.h"
@@ -145,5 +146,7 @@
 #include "crt/ZONGGUBEN.h"
 #include "crt/ZSCORE.h"
 #include "crt/QUANTILE_TRUNC.h"
+#include "crt/RSRS_BETA.h"
+#include "crt/RSRS_BULL.h"
 
 #endif /* INDICATOR_BUILD_IN_H_ */

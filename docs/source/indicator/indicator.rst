@@ -448,6 +448,46 @@
         mdi_value = adx.get(-1, 2)
 
 
+.. py:function:: ADX2([kdata, n=14])
+
+    平均趋向指数(ADX2) - 使用EMA平滑方式
+
+    ADX2属于趋势强度指标，不分辨涨跌方向，只判断有没有趋势。
+    与ADX的区别在于使用EMA（指数移动平均）而非Wilder平滑，对趋势变化更敏感。
+
+    :param KData kdata: 待计算的源数据
+    :param int n: 计算周期，默认14，必须为大于1的整数
+    :rtype: Indicator
+
+    * result(0): ADX2本身（趋势强度，值域0~100）
+    * result(1): +DI（上升动向线，多头力量）
+    * result(2): -DI（下降动向线，空头力量）
+
+    判断标准：
+
+    - ADX2 >= 25：存在清晰单边趋势（上涨/下跌都行）
+    - ADX2 < 25：无趋势，箱体震荡
+    - ADX2数值越大，趋势越猛
+
+    **与ADX的区别**：
+
+    - **ADX**：使用Wilder平滑（平滑系数=1/N），响应较慢但更稳定
+    - **ADX2**：使用EMA平滑（平滑系数=2/(N+1)），对趋势变化更敏感
+
+    **使用示例**::
+
+        # 获取K线数据
+        kdata = get_kdata('sh000001', Query(-200))
+        
+        # 计算ADX2指标
+        adx2 = ADX2(kdata, 14)
+        
+        # 获取ADX2值（索引0）、+DI值（索引1）、-DI值（索引2）
+        adx2_value = adx2.get(-1, 0)
+        pdi_value = adx2.get(-1, 1)
+        mdi_value = adx2.get(-1, 2)
+
+
 .. py:function:: AVEDEV(data[, n=22])
 
     平均绝对偏差，求X的N日平均绝对偏差
@@ -1724,6 +1764,90 @@
     :param data: 输入数据
     :param int|Indicator|IndParam n: 时间窗口
     :rtype: Indicator
+
+
+.. py:function:: RSRS_BULL([kdata, n=20, m=60])
+
+    RSRS 右偏标准分指标（层级4），基于光大研报进阶版修正 RSRS。
+
+    在修正标准分（Z × R²）基础上再乘一次原始 β，放大多头强势区间的分值、压缩空头弱势分值，专门做多择时用。
+
+    **计算层次**：
+    
+    1. **层次1（β）**：滚动 N 日 OLS 回归计算 β 值，公式：High = α + β · Low
+    2. **层次2（Z）**：滚动 M 日 Z-score 标准化，解决不同阶段 β 中枢漂移问题
+    3. **层次3（修正标准分）**：Z × R²，R² 为回归拟合优度，过滤拟合差的噪音
+    4. **层次4（右偏修正）**：Z × R² × β，放大多头强势区间
+
+    :param KData kdata: K线数据
+    :param int n: 回归窗口，默认为20
+    :param int m: Z-score窗口，默认为60
+    :rtype: Indicator
+
+    **返回结果**：
+
+    * result(0): 层级4修正值（右偏修正 = Z × R² × β）
+    * result(1): β 值（回归斜率）
+    * result(2): R² 值（回归拟合优度）
+    * result(3): Z 值（Z-score 标准化值）
+
+    **使用示例**::
+
+        # 获取K线数据
+        kdata = get_kdata('sh000001', Query(-1000))
+        
+        # 计算RSRS_BULL指标（默认n=20, m=60）
+        bull = RSRS_BULL(kdata)
+        
+        # 获取层级4修正值（结果集0）
+        bull_value = bull.get(-1, 0)
+        
+        # 获取 β 值（结果集1）
+        beta = bull.get(-1, 1)
+        
+        # 获取 R² 值（结果集2）
+        r2 = bull.get(-1, 2)
+        
+        # 获取 Z 值（结果集3）
+        z_score = bull.get(-1, 3)
+        
+        # 只有当 R² > 0.8 时，指标才有效
+        if r2 > 0.8:
+            print(f"有效 RSRS_BULL 值: {bull_value}")
+        else:
+            print("R² 过低，指标不可信")
+
+
+.. py:function:: RSRS_BETA([kdata, n=20])
+
+    原始 RSRS（底层 β）指标，基于滚动N日OLS回归。
+
+    每根K线贡献一个坐标点 (Low[i], High[i])，使用滚动窗口内的N个点进行OLS回归。
+    公式：High = α + β · Low
+
+    β 为最原始的 RSRS 斜率，代表支撑阻力强弱。
+    缺陷：不同行情区间 β 中枢波动大，不能跨时段直接对比。
+
+    :param KData kdata: K线数据
+    :param int n: 滚动窗口，默认为20
+    :rtype: Indicator
+
+    **计算原理**：
+    
+    1. 每根K线取自身的最低价 Low[i] 和最高价 High[i]，形成坐标点 (Low[i], High[i])
+    2. 使用滚动窗口内的N个点进行OLS线性回归，拟合直线 High = α + β · Low
+    3. β 值即为回归斜率，反映支撑阻力的强弱程度
+
+    **使用示例**::
+
+        # 获取K线数据
+        kdata = get_kdata('sh000001', Query(-200))
+        
+        # 计算RSRS_BETA指标（默认n=20）
+        rsrs_beta = RSRS_BETA(kdata)
+        
+        # 计算RSRS_BETA指标（自定义窗口大小）
+        rsrs_beta = RSRS_BETA(kdata, 10)
 
 
 .. py:function:: ROUND([data, ndigits=2])
