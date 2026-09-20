@@ -496,9 +496,6 @@ Indicator (*SLOPE3)(const Indicator&, int) = SLOPE;
 Indicator (*SLOPE4)(const Indicator&, const IndParam&) = SLOPE;
 Indicator (*SLOPE5)(const Indicator&, const Indicator&) = SLOPE;
 
-Indicator (*FITR2_1)(int) = FITR2;
-Indicator (*FITR2_2)(const Indicator&, int) = FITR2;
-
 Indicator (*ZHBOND10_1)(double) = ZHBOND10;
 Indicator (*ZHBOND10_2)(const DatetimeList&, double) = ZHBOND10;
 Indicator (*ZHBOND10_3)(const KData& k, double) = ZHBOND10;
@@ -530,6 +527,9 @@ Indicator (*KURT_5)(const Indicator&, const Indicator&) = KURT;
 
 Indicator (*ZSCORE_1)(bool, double, bool) = ZSCORE;
 Indicator (*ZSCORE_2)(const Indicator&, bool, double, bool) = ZSCORE;
+
+Indicator (*ADX_1)(int) = ADX;
+Indicator (*ADX_2)(const KData&, int) = ADX;
 
 void export_Indicator_build_in(py::module& m) {
     m.def("C_KDATA", KDATA1);
@@ -863,6 +863,27 @@ void export_Indicator_build_in(py::module& m) {
     :param KData kdata 待计算的源数据
     :param int n: 计算均值的周期窗口，必须为大于1的整数
     :rtype: Indicator)");
+
+    m.def("ADX", ADX_1, py::arg("n") = 14);
+    m.def("ADX", ADX_2, py::arg("kdata"), py::arg("n") = 14,
+          R"(ADX([kdata, n=14])
+
+    平均趋向指数(Average Directional Index)
+
+    ADX属于趋势强度指标，不分辨涨跌方向，只判断有没有趋势。采用威尔德（Wilder）原始公式。
+
+    :param KData kdata: 待计算的源数据
+    :param int n: 计算周期，默认14，必须为大于1的整数
+    :rtype: 具有三个结果集的 Indicator
+
+    * result(0): ADX本身（趋势强度，值域0~100）
+    * result(1): +DI（上升动向线，多头力量）
+    * result(2): -DI（下降动向线，空头力量）
+
+    判断标准：
+    - ADX >= 25：存在清晰单边趋势（上涨/下跌都行）
+    - ADX < 25：无趋势，箱体震荡
+    - ADX数值越大，趋势越猛)");
 
     m.def("MACD", MACD_1, py::arg("n1") = 12, py::arg("n2") = 26, py::arg("n3") = 9);
     m.def("MACD", MACD_2, py::arg("n1"), py::arg("n2"), py::arg("n3"));
@@ -2174,20 +2195,27 @@ void export_Indicator_build_in(py::module& m) {
     m.def("SLOPE", SLOPE4, py::arg("data"), py::arg("n"));
     m.def("SLOPE", SLOPE5, py::arg("data"), py::arg("n"), R"(SLOPE([data, n=22])
 
-    计算线性回归斜率，N支持变量
+    计算线性回归斜率、拟合优度R²和相对最大残差，N支持变量
 
     :param Indicator data: 输入数据
     :param int|Indicator|IndParam n: 时间窗口
-    :rtype: Indicator)");
+    :rtype: Indicator
 
-    m.def("FITR2", FITR2_1, py::arg("n") = 22);
-    m.def("FITR2", FITR2_2, py::arg("data"), py::arg("n") = 22, R"(FITR2([data, n=22])
+    **结果集**：
 
-    计算线性回归拟合优度R²
+    * result(0): 斜率
+    * result(1): 拟合优度 R²
+    * result(2): 相对最大残差 RelMaxRes = max|yi - ŷi| / ȳ
 
-    :param Indicator data: 输入数据
-    :param int n: 时间窗口，需 >= 2
-    :rtype: Indicator)");
+    **相对最大残差说明**：
+
+    * 分子：窗口内最大绝对残差（保证没有点严重远离回归线）
+    * 分母：窗口 y 均值（消除股价量纲，百分比含义）
+    * 指标越小 = 整段所有 K 线都紧贴回归线
+
+    **判定阈值举例**：
+
+    * RelMaxRes < 0.03：最远 K 线偏离均价不足 3%，全部点位贴合回归线)");
 
     m.def("MDD", py::overload_cast<int>(&MDD), py::arg("n") = 0);
     m.def("MDD", py::overload_cast<const Indicator&, int>(&MDD), py::arg("data"), py::arg("n") = 0,
@@ -2197,6 +2225,15 @@ void export_Indicator_build_in(py::module& m) {
     
     :param Indicator data: 输入数据
     :param int n: 时间窗口
+    :rtype: Indicator)");
+
+    m.def("MDD_CURRENT", py::overload_cast<>(&MDD_CURRENT));
+    m.def("MDD_CURRENT", py::overload_cast<const Indicator&>(&MDD_CURRENT), py::arg("data"),
+          R"(MDD_CURRENT([data])
+    
+    当前点到历史最高点的回撤百分比，按行业惯例为正值
+    
+    :param Indicator data: 输入数据
     :rtype: Indicator)");
 
     m.def("MRR", py::overload_cast<int>(&MRR), py::arg("n") = 0);

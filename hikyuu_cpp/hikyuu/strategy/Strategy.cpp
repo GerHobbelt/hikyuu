@@ -375,6 +375,21 @@ KData Strategy::getKData(const Stock& stk, const Datetime& start_date, const Dat
     return stk.getKData(KQueryByDate(start_date, new_end_date, ktype, recover_type));
 }
 
+price_t Strategy::getPriceByTime(const Stock& stk, const TimeDelta& time,
+                                 const KQuery::KType& ktype) const {
+    Datetime start = today() + time;
+    Datetime end = start + time;
+    if ((now() - today()) != TimeDelta()) {
+        // 非日线级别如分钟线，尝试获取当前时间之后的价格，强制限定为当前时间
+        if (end > now()) {
+            end = now();
+        }
+    }
+    end = end + Seconds(KQuery::getKTypeInSeconds(ktype));
+    KData k = stk.getKData(KQueryByDate(start, end, ktype));
+    return k.empty() ? Null<price_t>() : k.back().closePrice;
+}
+
 KData Strategy::getLastKData(const Stock& stk, size_t lastnum, const KQuery::KType& ktype,
                              KQuery::RecoverType recover_type) const {
     KData ret;

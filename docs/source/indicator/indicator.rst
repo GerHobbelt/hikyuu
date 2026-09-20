@@ -226,6 +226,65 @@
 
     聚合函数: 乘积, 可参考 :func:`AGG_STD` 
 
+.. py:function:: AGG_SAMPLE(ind[, time="9:35", ktype=Query.MIN, fill_null=False, unit=1])
+
+    时间采样聚合指标，在指定时间点对指标数据进行采样。
+
+    如果找不到精确匹配的时间，会选择最接近目标时间之前的有效数据。
+
+    :param Indicator ind: 输入指标
+    :param str time: 指定采样时间，格式为 HH:MM，默认为 "9:35"
+    :param KQuery.KType ktype: 聚合的K线周期
+    :param bool fill_null: 是否填充缺失值
+    :param int unit: 聚合周期单位
+    :return: 指标数据
+    :rtype: Indicator
+
+.. py:function:: AGG_SAMPLE_MAX(ind[, start_time="9:30", last_time="10:00", ktype=Query.MIN, fill_null=False, unit=1])
+
+    时间段最大值聚合指标，在指定时间段 [start_time, last_time] 内统计指标数据的最大值。
+
+    包含 start_time 和 last_time 本身。
+
+    :param Indicator ind: 输入指标
+    :param str start_time: 时间段开始时间，格式为 HH:MM，默认为 "9:30"
+    :param str last_time: 时间段结束时间，格式为 HH:MM，默认为 "10:00"
+    :param KQuery.KType ktype: 聚合的K线周期
+    :param bool fill_null: 是否填充缺失值
+    :param int unit: 聚合周期单位
+    :return: 指标数据
+    :rtype: Indicator
+
+.. py:function:: AGG_SAMPLE_MIN(ind[, start_time="9:30", last_time="10:00", ktype=Query.MIN, fill_null=False, unit=1])
+
+    时间段最小值聚合指标，在指定时间段 [start_time, last_time] 内统计指标数据的最小值。
+
+    包含 start_time 和 last_time 本身。
+
+    :param Indicator ind: 输入指标
+    :param str start_time: 时间段开始时间，格式为 HH:MM，默认为 "9:30"
+    :param str last_time: 时间段结束时间，格式为 HH:MM，默认为 "10:00"
+    :param KQuery.KType ktype: 聚合的K线周期
+    :param bool fill_null: 是否填充缺失值
+    :param int unit: 聚合周期单位
+    :return: 指标数据
+    :rtype: Indicator
+
+.. py:function:: AGG_SAMPLE_MEAN(ind[, start_time="9:30", last_time="10:00", ktype=Query.MIN, fill_null=False, unit=1])
+
+    时间段平均值聚合指标，在指定时间段 [start_time, last_time] 内统计指标数据的平均值。
+
+    包含 start_time 和 last_time 本身。
+
+    :param Indicator ind: 输入指标
+    :param str start_time: 时间段开始时间，格式为 HH:MM，默认为 "9:30"
+    :param str last_time: 时间段结束时间，格式为 HH:MM，默认为 "10:00"
+    :param KQuery.KType ktype: 聚合的K线周期
+    :param bool fill_null: 是否填充缺失值
+    :param int unit: 聚合周期单位
+    :return: 指标数据
+    :rtype: Indicator
+
 .. py:function:: AGG_QUANTILE(ind[, ktype=Query.MIN, fill_null=False, unit=1, quantile=0.75])
 
     聚合其他K线周期分位数, 可参考 AGG_STD 帮助
@@ -344,6 +403,49 @@
     :param KData kdata: 待计算的源数据
     :param int n: 计算均值的周期窗口，必须为大于1的整数
     :rtype: Indicator
+
+
+.. py:function:: ADX([kdata, n=14])
+
+    平均趋向指数(Average Directional Index)
+
+    ADX属于趋势强度指标，不分辨涨跌方向，只判断有没有趋势。采用威尔德（Wilder）原始公式。
+
+    :param KData kdata: 待计算的源数据
+    :param int n: 计算周期，默认14，必须为大于1的整数
+    :rtype: Indicator
+
+    * result(0): ADX本身（趋势强度，值域0~100）
+    * result(1): +DI（上升动向线，多头力量）
+    * result(2): -DI（下降动向线，空头力量）
+
+    判断标准：
+
+    - ADX >= 25：存在清晰单边趋势（上涨/下跌都行）
+    - ADX < 25：无趋势，箱体震荡
+    - ADX数值越大，趋势越猛
+
+    **计算原理**：
+
+    1. **真实波幅（TR）**：TR = max(HIGH-LOW, abs(HIGH-REF(CLOSE,1)), abs(LOW-REF(CLOSE,1)))
+    2. **动向波动（+DM/-DM）**：+DM = HIGH - REF(HIGH,1)（若>0且大于-DM）；-DM = REF(LOW,1) - LOW（若>0且大于+DM）
+    3. **Wilder平滑**：初始为N周期简单平均，后续使用递归公式 S_t = S_{t-1} * (N-1)/N + X_t/N
+    4. **动向指数（±DI）**：+DI = 100 * (+DM平滑值) / TR平滑值；-DI = 100 * (-DM平滑值) / TR平滑值
+    5. **动向指数（DX）**：DX = 100 * abs(+DI - (-DI)) / (+DI + (-DI))
+    6. **平均动向指数（ADX）**：对DX进行Wilder平滑
+
+    **使用示例**::
+
+        # 获取K线数据
+        kdata = get_kdata('sh000001', Query(-200))
+        
+        # 计算ADX指标
+        adx = ADX(kdata, 14)
+        
+        # 获取ADX值（索引0）、+DI值（索引1）、-DI值（索引2）
+        adx_value = adx.get(-1, 0)
+        pdi_value = adx.get(-1, 1)
+        mdi_value = adx.get(-1, 2)
 
 
 .. py:function:: AVEDEV(data[, n=22])
@@ -1345,6 +1447,18 @@
     最大回撤百分比(n=0 则无时间窗口限制), 按行业惯例为正值
 
 
+.. py:function:: MDD_CURRENT([data])
+
+    当前点到历史最高点的回撤百分比，按行业惯例为正值
+    
+    计算公式：(历史最高点 - 当前值) / 历史最高点 * 100%
+    
+    与 MDD 的区别：MDD 计算的是到指定窗口内最高点的回撤，而 MDD_CURRENT 计算的是到从序列起始点到当前点的历史最高点的回撤，不设时间窗口限制。
+    
+    :param Indicator data: 输入数据
+    :rtype: Indicator
+
+
 .. py:function:: MIN(ind1, ind2)
 
     求最小值, MIN(A,B)返回A和B中的较小值。
@@ -1691,25 +1805,27 @@
 
 .. py:function:: SLOPE(data, n=22)
 
-    计算线性回归斜率，N支持变量
+    计算线性回归斜率、拟合优度R²和相对最大残差，N支持变量
 
     :param Indicator|sequence data: 输入数据
     :param int|Indicator|IndParam n: 时间窗口
     :rtype: Indicator
 
-
-.. py:function:: FITR2(data, n=22)
-
-    计算线性回归拟合优度R²和斜率
-
-    :param Indicator|sequence data: 输入数据
-    :param int n: 时间窗口，需 >= 2
-    :rtype: Indicator
-    
     **结果集**：
-    
-    * 结果集0：R² 值（拟合优度）
-    * 结果集1：斜率（SLOPE）
+
+    * result(0): 斜率
+    * result(1): 拟合优度 R²
+    * result(2): 相对最大残差 RelMaxRes = max|yi - ŷi| / ȳ
+
+    **相对最大残差说明**：
+
+    * 分子：窗口内最大绝对残差（保证没有点严重远离回归线）
+    * 分母：窗口 y 均值（消除股价量纲，百分比含义）
+    * 指标越小 = 整段所有 K 线都紧贴回归线
+
+    **判定阈值举例**：
+
+    * RelMaxRes < 0.03：最远 K 线偏离均价不足 3%，全部点位贴合回归线
 
 
 .. py:function:: SMA([data, n=22, m=2])
