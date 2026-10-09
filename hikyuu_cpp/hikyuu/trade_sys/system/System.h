@@ -22,14 +22,13 @@
 #include "../slippage/SlippageBase.h"
 #include "TradeRequest.h"
 #include "SystemPart.h"
+#include "MomentResult.h"
 #include "../../serialization/KData_serialization.h"
 
 namespace hku {
 
 using json = nlohmann::json;
 
-class HKU_API Portfolio;
-class HKU_API AllocateFundsBase;
 class HKU_API WalkForwardSystem;
 
 /**
@@ -38,8 +37,6 @@ class HKU_API WalkForwardSystem;
  */
 class HKU_API System : public enable_shared_from_this<System> {
     PARAMETER_SUPPORT_WITH_CHECK
-    friend class HKU_API Portfolio;
-    friend class HKU_API AllocateFundsBase;
     friend class HKU_API WalkForwardSystem;
 
 public:
@@ -149,14 +146,14 @@ public:
     /** 获取实际执行的交易记录，和 TM 的区别是不包含权息调整带来的交易记录 */
     const TradeRecordList& getTradeRecordList() const;
 
-    /** 获取买入请求，“delay”模式下查看下一时刻是否存在买入操作 */
-    const TradeRequest& getBuyTradeRequest() const;
+    /** 获取买入请求列表，“delay”模式下查看下一时刻是否存在买入操作 */
+    const std::vector<TradeRequest>& getBuyTradeRequestList() const;
 
-    /** 获取卖出请求，“delay”模式下查看下一时刻是否存在卖出操作 */
-    const TradeRequest& getSellTradeRequest() const;
+    /** 获取卖出请求列表，“delay”模式下查看下一时刻是否存在卖出操作 */
+    const std::vector<TradeRequest>& getSellTradeRequestList() const;
 
-    const TradeRequest& getSellShortTradeRequest() const;
-    const TradeRequest& getBuyShortTradeRequest() const;
+    const std::vector<TradeRequest>& getSellShortTradeRequestList() const;
+    const std::vector<TradeRequest>& getBuyShortTradeRequestList() const;
 
     /** 将所有组件全部置为非共享 */
     void setNotSharedAll();
@@ -214,14 +211,45 @@ public:
     virtual void run(const KData& kdata, bool reset = true, bool resetAll = false);
 
     /**
-     * @brief 在指定的日期执行一步，仅由 PF 调用
+     * @brief 在指定的日期执行一步，由聚合系统（MultiSystem）或实盘驱动调用
      * @param datetime 指定的日期
-     * @return TradeRecord
+     * @return MomentResult
      */
-    virtual TradeRecord runMoment(const Datetime& datetime);
+    virtual MomentResult runMoment(const Datetime& datetime);
 
-    virtual TradeRecord runMomentOnOpen(const Datetime& datetime);
-    virtual TradeRecord runMomentOnClose(const Datetime& datetime);
+    virtual MomentResult runMomentOnOpen(const Datetime& datetime);
+    virtual MomentResult runMomentOnClose(const Datetime& datetime);
+
+    //========================================
+    // 聚合形态（MultiSystem）接口，单证券形态返回默认值
+    //========================================
+
+    /** 是否为聚合形态（持有子系统）。单证券形态返回 false。 */
+    virtual bool isComposite() const {
+        return false;
+    }
+
+    /** 获取直接子系统列表，聚合形态重写。单证券形态返回空表。 */
+    virtual const std::vector<std::shared_ptr<System>>& getSubSystemList() const;
+
+    /** 层级路径（如 I/D/A），供 trace 与调试。聚合形态在 readyForRun 时维护。 */
+    virtual const string& getPath() const {
+        return m_path;
+    }
+
+    /** 设置层级路径（聚合形态在 readyForRun 时递归写入子系统） */
+    void setPath(const string& path) {
+        m_path = path;
+    }
+
+    /** 【模式 B】父向子系统回写分配额度（仅调仓日）。单证券形态为 no-op。 */
+    virtual void setSubSystemQuota(const std::shared_ptr<System>& sub_sys, const Datetime& date,
+                                   price_t quota) {}
+
+    /** 将自身本时刻成交转译为对上建议（聚合形态重写）。单证券形态返回空。 */
+    virtual TradeSuggestionList toSuggestions() const {
+        return TradeSuggestionList{};
+    }
 
     // 运行前准备工作, 失败将抛出异常
     virtual void readyForRun();
@@ -243,37 +271,38 @@ public:
 
 public:
     //-------------------------
-    // 仅供 PF/AF 内部调用
+    // 仅供聚合系统（MultiSystem）内部调用
     //-------------------------
 
-    // 强制以开盘价卖出，仅供 PF/AF 内部调用
+    // 强制以开盘价卖出，仅供聚合系统内部调用
+    // @note from 允许 PART_SYSTEM；PART_PORTFOLIO 为已废弃 PF 的历史兼容值（保留以兼容旧序列化数据）
     virtual TradeRecord sellForceOnOpen(const Datetime& date, double num, Part from) {
-        HKU_ASSERT(from == PART_ALLOCATEFUNDS || from == PART_PORTFOLIO);
+        HKU_ASSERT(from == PART_PORTFOLIO || from == PART_SYSTEM);
         return _sellForce(date, num, from, true);
     }
 
-    // 强制以收盘价卖出，仅供 PF/AF 内部调用
+    // 强制以收盘价卖出，仅供聚合系统内部调用
     virtual TradeRecord sellForceOnClose(const Datetime& date, double num, Part from) {
-        HKU_ASSERT(from == PART_ALLOCATEFUNDS || from == PART_PORTFOLIO);
+        HKU_ASSERT(from == PART_PORTFOLIO || from == PART_SYSTEM);
         return _sellForce(date, num, from, false);
     }
 
-    // 清除已有的交易请求，供Portfolio使用
+    // 清除已有的交易请求，供聚合系统使用
     virtual void clearDelayBuyRequest();
 
-    // 当前是否存在延迟的操作请求，供Portfolio
+    // 当前是否存在延迟的操作请求，供聚合系统使用
     bool haveDelaySellRequest() const {
-        return m_sellRequest.valid;
+        return !m_sellRequestList.empty();
     }
 
     bool haveDelayBuyRequest() const {
-        return m_buyRequest.valid;
+        return !m_buyRequestList.empty();
     }
 
-    // 处理延迟买入请求，仅供 PF 调用
+    // 处理延迟卖出请求，仅供聚合系统调用
     virtual TradeRecord pfProcessDelaySellRequest(const Datetime& date);
 
-    // 处理延迟买入请求，仅供 PF 调用
+    // 处理延迟买入请求，仅供聚合系统调用
     virtual TradeRecord pfProcessDelayBuyRequest(const Datetime& date);
 
     bool isPythonObject() const noexcept {
@@ -332,12 +361,13 @@ private:
     TradeRecord _runMomentOnOpen(const KRecord& today, const KRecord& src_today);
     TradeRecord _runMomentOnClose(const KRecord& today, const KRecord& src_today);
 
-    // Portfolio | AllocateFunds 指示立即进行强制卖出，以便对 buy_delay 的系统进行资金调整
+    // 聚合系统（MultiSystem）指示立即进行强制卖出，以便对 buy_delay 的系统进行资金调整
     TradeRecord _sellForce(const Datetime& date, double num, Part from, bool on_open);
 
 protected:
     TradeManagerPtr m_tm;
     MoneyManagerPtr m_mm;
+    string m_path;  // 层级路径（聚合形态使用）
     EnvironmentPtr m_ev;
     ConditionPtr m_cn;
     SignalPtr m_sg;
@@ -362,10 +392,10 @@ protected:
     price_t m_lastTakeProfit;       // 上一次多头止损价，用于保证止赢价单调递增
     price_t m_lastShortTakeProfit;  // 上一次空头止赢价
 
-    TradeRequest m_buyRequest;
-    TradeRequest m_sellRequest;
-    TradeRequest m_sellShortRequest;
-    TradeRequest m_buyShortRequest;
+    std::vector<TradeRequest> m_buyRequestList;
+    std::vector<TradeRequest> m_sellRequestList;
+    std::vector<TradeRequest> m_sellShortRequestList;
+    std::vector<TradeRequest> m_buyShortRequestList;
 
 private:
     void initParam();  // 初始化参数及其默认值
@@ -405,10 +435,10 @@ private:
         ar& BOOST_SERIALIZATION_NVP(m_lastTakeProfit);
         ar& BOOST_SERIALIZATION_NVP(m_lastShortTakeProfit);
 
-        ar& BOOST_SERIALIZATION_NVP(m_buyRequest);
-        ar& BOOST_SERIALIZATION_NVP(m_sellRequest);
-        ar& BOOST_SERIALIZATION_NVP(m_sellShortRequest);
-        ar& BOOST_SERIALIZATION_NVP(m_buyShortRequest);
+        ar& BOOST_SERIALIZATION_NVP(m_buyRequestList);
+        ar& BOOST_SERIALIZATION_NVP(m_sellRequestList);
+        ar& BOOST_SERIALIZATION_NVP(m_sellShortRequestList);
+        ar& BOOST_SERIALIZATION_NVP(m_buyShortRequestList);
     }
 
     template <class Archive>
@@ -440,10 +470,10 @@ private:
         ar& BOOST_SERIALIZATION_NVP(m_lastTakeProfit);
         ar& BOOST_SERIALIZATION_NVP(m_lastShortTakeProfit);
 
-        ar& BOOST_SERIALIZATION_NVP(m_buyRequest);
-        ar& BOOST_SERIALIZATION_NVP(m_sellRequest);
-        ar& BOOST_SERIALIZATION_NVP(m_sellShortRequest);
-        ar& BOOST_SERIALIZATION_NVP(m_buyShortRequest);
+        ar& BOOST_SERIALIZATION_NVP(m_buyRequestList);
+        ar& BOOST_SERIALIZATION_NVP(m_sellRequestList);
+        ar& BOOST_SERIALIZATION_NVP(m_sellShortRequestList);
+        ar& BOOST_SERIALIZATION_NVP(m_buyShortRequestList);
     }
 
     BOOST_SERIALIZATION_SPLIT_MEMBER()
@@ -591,20 +621,20 @@ inline const TradeRecordList& System::getTradeRecordList() const {
     return m_trade_list;
 }
 
-inline const TradeRequest& System::getBuyTradeRequest() const {
-    return m_buyRequest;
+inline const std::vector<TradeRequest>& System::getBuyTradeRequestList() const {
+    return m_buyRequestList;
 }
 
-inline const TradeRequest& System::getSellTradeRequest() const {
-    return m_sellRequest;
+inline const std::vector<TradeRequest>& System::getSellTradeRequestList() const {
+    return m_sellRequestList;
 }
 
-inline const TradeRequest& System::getSellShortTradeRequest() const {
-    return m_sellShortRequest;
+inline const std::vector<TradeRequest>& System::getSellShortTradeRequestList() const {
+    return m_sellShortRequestList;
 }
 
-inline const TradeRequest& System::getBuyShortTradeRequest() const {
-    return m_buyShortRequest;
+inline const std::vector<TradeRequest>& System::getBuyShortTradeRequestList() const {
+    return m_buyShortRequestList;
 }
 
 inline bool System::_environmentIsValid(const Datetime& datetime) {
